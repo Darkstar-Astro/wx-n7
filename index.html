@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astro Weather — multi-model seeing & sky</title>
+<style>
+:root{
+  --bg:#07090e; --panel:#10141c; --line:#1e2532; --txt:#d7dce5; --mut:#7d8798; --acc:#6ea8ff;
+  --good:#1f4fd6; --bad:#e6e9ef;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#redfilter{position:fixed;inset:0;background:#ff0000;mix-blend-mode:multiply;pointer-events:none;display:none;z-index:999}
+body.red #redfilter{display:block}
+body.red{filter:brightness(.75)}
+header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:20;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;flex:1;min-width:140px}
+header h1 small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+button,select,input{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit}
+button{cursor:pointer} button:active{transform:scale(.97)}
+main{padding:12px;max-width:1400px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
+.verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.kpi{background:#0b0e14;border:1px solid var(--line);border-radius:10px;padding:8px}
+.kpi b{display:block;font-size:16px}
+.kpi span{color:var(--mut);font-size:12px}
+.mut{color:var(--mut)} .small{font-size:12px}
+.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+table.g{border-collapse:separate;border-spacing:0;font-size:10.5px}
+table.g th,table.g td{padding:0;text-align:center;min-width:30px;height:22px;border-right:1px solid #0000;white-space:nowrap}
+table.g td.lab,table.g th.lab{position:sticky;left:0;background:var(--panel);text-align:left;padding:0 8px;min-width:118px;z-index:2;font-size:11.5px;border-right:1px solid var(--line)}
+table.g tr.sep td{height:6px}
+table.g th{color:var(--mut);font-weight:500}
+table.g th.day{color:var(--txt);text-align:left;padding-left:4px;border-left:1px solid #3a4558}
+table.g td.dayb,table.g th.dayb{border-left:1px solid #3a4558}
+table.g td.cell{cursor:pointer;color:#0a0f1a;font-variant-numeric:tabular-nums}
+table.g td.cell.lt{color:#e9eefb}
+table.g td.sel{outline:2px solid #ffd76a;outline-offset:-2px}
+table.g tr.group td.lab{color:var(--acc);font-weight:600;padding-top:6px}
+#detail table{border-collapse:collapse;width:100%;font-size:12.5px}
+#detail th,#detail td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+#detail th:first-child,#detail td:first-child{text-align:left}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+details summary{cursor:pointer;color:var(--acc)}
+dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:12px;max-width:420px;width:92%}
+dialog::backdrop{background:#000a}
+label{display:block;margin:6px 0 2px;color:var(--mut);font-size:12px}
+dialog input,dialog select{width:100%}
+.legend{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--mut);flex-wrap:wrap}
+.sw{display:inline-block;width:60px;height:10px;border-radius:3px;background:linear-gradient(90deg,var(--bad),#8fa9dc,var(--good))}
+#status{font-size:12px;color:var(--mut)}
+.err{color:#f08080}
+code{background:#0b0e14;padding:1px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="redfilter"></div>
+<header>
+  <h1><span id="locname">—</span><small id="loccoord"></small></h1>
+  <select id="preset" title="Location"></select>
+  <button id="btnLocate" title="Use my location">📍</button>
+  <button id="btnEdit" title="Edit / save location">✎</button>
+  <button id="btnNight" title="Show night hours only">🌙 Night</button>
+  <button id="btnRed" title="Red-light mode">🔴</button>
+  <button id="btnReload" title="Reload">↻</button>
+</header>
+<main>
+  <div id="status">Loading…</div>
+  <div class="card" id="tonight"></div>
+  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew</div>
+  <div class="gridwrap"><table class="g" id="grid"></table></div>
+  <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
+  <div class="card">
+    <details>
+      <summary>Method & assumptions</summary>
+      <div class="small" style="margin-top:8px">
+      <p><b>Data.</b> Open-Meteo, fetched live from your browser, one request per model: ECMWF IFS, DWD ICON (seamless: D2→EU→global), Météo-France (AROME→ARPEGE), KNMI Harmonie, UK Met Office, NOAA GFS. Aerosol optical depth comes from CAMS (Open-Meteo air-quality API). A model that is out of domain or returns nothing is left out, and the top-right list shows which ones loaded.</p>
+      <p><b>Consensus.</b> Each metric is the <i>median</i> across the models that loaded. Model agreement is the standard deviation of total cloud cover across models.</p>
+      <p><b>Seeing (a proxy, not a measurement).</b> None of these models outputs seeing. It is estimated per model as<br>
+      <code>arcsec = 0.9 + 0.045·max(0, jet−12) + 0.04·max(0, shear−8) + 0.06·max(0, gust−4)</code><br>
+      with <code>jet = max(wind 200 hPa, 250 hPa)</code>, <code>shear = |wind 500 − wind 850 hPa|</code> and <code>gust</code> the 10 m gust, all in m/s. It is calibrated loosely to Benelux experience (jet stream above ~30 m/s ≈ poor seeing). It does not account for local ground-layer or tube/mirror effects. Use it for relative ranking between nights, not as an absolute FWHM.</p>
+      <p><b>Seeing scale.</b> 5 Excellent (&lt;1.2″), 4 Good (1.2–1.7″), 3 Average (1.7–2.3″), 2 Poor (2.3–3″), 1 Bad (&gt;3″). The arcsecond value is the estimated star blur. Typical good nights in Belgium are 3–4.</p>
+      <p><b>Transparency (0–100).</b> <code>100 − 0.6·high cloud − 1.2·max(0, RH₂ₘ−70) − 0.3·max(0, RH₇₀₀−60) − 80·AOD</code>. High cloud is penalised because thin cirrus ruins transparency even when the total cloud figure looks low. Low and mid cloud already count in the cloud rows.</p>
+      <p><b>Fog.</b> Uses the model visibility where a model gives it (under 1 km is high risk, under 2 km elevated). Otherwise, a temperature − dew point spread of 0.5 °C or less with wind under 3 m/s counts as high risk. The page shows the median across models.</p>
+      <p><b>Transparency scale.</b> 5 Excellent (≥80), 4 Good (65–79), 3 Average (50–64), 2 Poor (35–49), 1 Bad (&lt;35), from the 0–100 formula above.</p>
+      <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
+      <p><b>Score (0–100).</b> <code>0.65·(100−cloud) + 0.2·transparency + 0.15·seeing (scaled)</code>, capped at 20 when cloud is over 70%. The moon does not count toward the score (it matters for DSOs but not for planets). It shows in the Darkness row.</p>
+      <p><b>SQM (estimate).</b> No model forecasts sky brightness. It starts from the location's <i>baseline SQM</i> (clear, moonless, astro-dark zenith), which you set with ✎. Defaults: Aalst 19.0 (measured median, Unihedron SQM). Lesse (Redu) 21.1 and Grandpré 21.5 are derived from lightpollutionmap.app (Bortle 4.4 and 3.6), so replace them with your SQM readings. Replace them with your own meter reading or the World Atlas value from lightpollutionmap.info. The baseline is split into natural sky (21.9) and artificial light. Light pollution is scaled up by humidity above 70%, by AOD above 0.1, and by cloud (×(1+3·cloud), because clouds reflect city light back down). Natural sky is dimmed by cloud. Twilight adds <code>21.9−0.82·(sun alt+18)</code> mag above −18°. The moon adds a term that reaches about 18.1 mag/arcsec² for a full moon at 60° altitude, scaled by the standard phase law and by sin(alt)<sup>0.8</sup>, and boosted by aerosols. Expect ±0.3–0.5 mag. "SQM if clear" shows what the sky would read with zero cloud, which is useful when the clouds are uncertain.</p>
+      <p><b>Bortle</b> is converted from SQM with the common approximate table: ≥21.99 → 1, 21.89 → 2, 21.69 → 3, 20.49 → 4, 19.50 → 5, 18.94 → 6, 18.38 → 7, 17.80 → 8, below that 9. Bortle is really a visual scale, so this is a rough equivalent. The hourly row shows how much the moon, twilight and cloud degrade the site that night.</p>
+      <p><b>Sun and moon.</b> Computed locally from low-precision ephemerides (about 0.5° accuracy, with a topocentric moon-parallax correction). Darkness row colours run from day to civil, nautical and astronomical twilight to astro-dark. Grey means the moon is up, and a brighter grey means a brighter moon.</p>
+      <p><b>Times</b> are local to the selected location.</p>
+      </div>
+    </details>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="locform">
+    <h3 style="margin-top:0">Location</h3>
+    <label>Name</label><input id="fName" required>
+    <label>Latitude (°N, negative = S)</label><input id="fLat" type="number" step="any" required>
+    <label>Longitude (°E, negative = W)</label><input id="fLon" type="number" step="any" required>
+    <label>Baseline SQM: clear, moonless, astro-dark zenith (mag/arcsec²). Use your own meter reading or the lightpollutionmap.info value.</label><input id="fSqm" type="number" step="0.01" min="16" max="22.2" required>
+    <div class="row" style="margin-top:12px;justify-content:space-between">
+      <button type="button" id="fDel">Delete preset</button>
+      <div class="row"><button type="button" id="fCancel">Cancel</button><button type="submit">Save & use</button></div>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+// ---------- settings ----------
+const DEFAULT_PRESETS = [
+  {name:"Aalst", lat:50.937, lon:4.040, sqm:19.0},
+  {name:"Lesse (Redu)", lat:49.988, lon:5.156, sqm:21.1},
+  {name:"Grandpré", lat:49.341, lon:4.868, sqm:21.5},
+];
+const MODELS = [
+  {key:"ecmwf", label:"ECMWF IFS", ids:["ecmwf_ifs","ecmwf_ifs025"]},
+  {key:"icon",  label:"DWD ICON",  ids:["icon_seamless"]},
+  {key:"mf",    label:"Météo-France", ids:["meteofrance_seamless"]},
+  {key:"knmi",  label:"KNMI Harmonie", ids:["knmi_seamless"]},
+  {key:"ukmo",  label:"UK Met Office", ids:["ukmo_seamless"]},
+  {key:"gfs",   label:"NOAA GFS", ids:["gfs_seamless"]},
+];
+const VARS = ["cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","relative_humidity_2m","dew_point_2m",
+  "temperature_2m","wind_speed_10m","wind_gusts_10m","precipitation","visibility","wind_speed_200hPa","wind_speed_250hPa",
+  "wind_speed_500hPa","wind_speed_850hPa","relative_humidity_700hPa"];
+const nn=x=>x!=null&&isFinite(x);
+const store = {
+  get(k,d){try{const v=localStorage.getItem("astrowx."+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("astrowx."+k,JSON.stringify(v))}catch(e){}}
+};
+let presets = store.get("presets", DEFAULT_PRESETS);
+if(store.get("presetsVer",1)<2){ // replace old default sites, keep user-added ones
+  const old=["Home (set me)","Aalst","Ardennes – Olizy-Primat","La Palma – Puntagorda"];
+  presets=[...DEFAULT_PRESETS,...presets.filter(p=>!old.includes(p.name)&&!DEFAULT_PRESETS.some(d=>d.name===p.name))];
+  store.set("presets",presets); store.set("presetsVer",2); store.set("cur",0);
+}
+if(store.get("presetsVer",2)<4){ // Grandpré -> 21.5 (lightpollutionmap.app: Bortle 3.6), only if untouched
+  presets=presets.map(p=>p.name==="Grandpré"&&[21.4,21.7].includes(p.sqm)?{...p,lat:49.341,lon:4.868,sqm:21.5}:p);
+  store.set("presets",presets); store.set("presetsVer",4);
+}
+if(store.get("presetsVer",2)<5){ // Lesse -> 21.1 (lightpollutionmap.app: Bortle 4.4), only if untouched
+  presets=presets.map(p=>p.name==="Lesse (Redu)"&&p.sqm===21.2?{...p,lat:49.988,lon:5.156,sqm:21.1}:p);
+  store.set("presets",presets); store.set("presetsVer",5);
+}
+presets = presets.map(p=>p.name==="Home (set me)"?{name:"Aalst",lat:50.937,lon:4.040}:p)
+  .map(p=>nn(p.sqm)?p:{...p,sqm:(DEFAULT_PRESETS.find(d=>d.name===p.name)||{sqm:19.5}).sqm});
+let cur = store.get("cur", 0); if(cur>=presets.length) cur=0;
+let nightOnly = store.get("nightOnly", true);
+let red = store.get("red", false);
+let H = [], loadedModels = [], selIdx = null;
+
+// ---------- math helpers ----------
+const rad=Math.PI/180, deg=180/Math.PI;
+const median=a=>{const v=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y);if(!v.length)return null;const m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2};
+const sd=a=>{const v=a.filter(x=>x!=null&&isFinite(x));if(v.length<2)return null;const m=v.reduce((s,x)=>s+x,0)/v.length;return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/v.length)};
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const n0=(x,d=0)=>nn(x)?x.toFixed(d):"–";
+
+// ---------- ephemerides (low precision) ----------
+function jdays(ms){return ms/86400000 + 2440587.5 - 2451545.0}
+function gmst(d){return (280.46061837+360.98564736629*d)%360}
+function altOf(ra,dec,d,lat,lon){
+  const ha=(gmst(d)+lon-ra)*rad;
+  return Math.asin(Math.sin(lat*rad)*Math.sin(dec*rad)+Math.cos(lat*rad)*Math.cos(dec*rad)*Math.cos(ha))*deg;
+}
+function eclToEq(lam,bet,eps){
+  const l=lam*rad,b=bet*rad,e=eps*rad;
+  const ra=Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l))*deg;
+  const dec=Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l))*deg;
+  return [(ra+360)%360,dec];
+}
+function sunLon(d){
+  const g=(357.528+0.9856003*d)*rad, L=280.460+0.9856474*d;
+  return ((L+1.915*Math.sin(g)+0.020*Math.sin(2*g))%360+360)%360;
+}
+function moonEcl(d){
+  const L0=218.316+13.176396*d, M=(134.963+13.064993*d)*rad, F=(93.272+13.229350*d)*rad,
+        D=(297.850+12.190749*d)*rad, Ms=(357.529+0.98560028*d)*rad;
+  let lam=L0+6.289*Math.sin(M)-1.274*Math.sin(M-2*D)+0.658*Math.sin(2*D)-0.186*Math.sin(Ms)
+          -0.059*Math.sin(2*M-2*D)-0.057*Math.sin(M-2*D+Ms)+0.053*Math.sin(M+2*D)-0.046*Math.sin(2*D-Ms)+0.041*Math.sin(M-Ms)-0.035*Math.sin(D)-0.031*Math.sin(M+Ms);
+  const bet=5.128*Math.sin(F)+0.281*Math.sin(M+F)-0.278*Math.sin(F-M)-0.173*Math.sin(F-2*D);
+  return [((lam%360)+360)%360,bet];
+}
+function sunAlt(ms,lat,lon){const d=jdays(ms),eps=23.439-4e-7*d;const [ra,dec]=eclToEq(sunLon(d),0,eps);return altOf(ra,dec,d,lat,lon)}
+function moonInfo(ms,lat,lon){
+  const d=jdays(ms),eps=23.439-4e-7*d,[lm,bm]=moonEcl(d),ls=sunLon(d);
+  const [ra,dec]=eclToEq(lm,bm,eps);
+  let alt=altOf(ra,dec,d,lat,lon); alt-=0.95*Math.cos(alt*rad); // parallax
+  const psi=Math.acos(Math.cos(bm*rad)*Math.cos((lm-ls)*rad));
+  const illum=(1-Math.cos(psi))/2; // phase angle ≈ 180°-elongation
+  const waxing=((lm-ls+360)%360)<180;
+  return {alt,illum,waxing};
+}
+
+// ---------- fetching ----------
+function fUrl(id,p){
+  return `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=${VARS.join(",")}`+
+         `&models=${id}&forecast_days=4&timezone=auto&wind_speed_unit=ms`;
+}
+async function fetchModel(m,p){
+  for(const id of m.ids){
+    try{
+      const r=await fetch(fUrl(id,p)); if(!r.ok) continue;
+      const j=await r.json(); if(j.error||!j.hourly) continue;
+      const cc=j.hourly.cloud_cover||[]; if(!cc.some(nn)) continue;
+      return {m,id,j};
+    }catch(e){}
+  }
+  return null;
+}
+async function fetchAQ(p){
+  try{
+    const r=await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.lat}&longitude=${p.lon}&hourly=aerosol_optical_depth,dust&forecast_days=4&timezone=auto`);
+    if(!r.ok) return null; const j=await r.json(); return j.hourly?j:null;
+  }catch(e){return null}
+}
+
+// ---------- derived metrics ----------
+function seeingArcsec(v){
+  const jet=Math.max(nn(v.w200)?v.w200:-1, nn(v.w250)?v.w250:-1);
+  if(jet<0) return null;
+  const shear=(nn(v.w500)&&nn(v.w850))?Math.abs(v.w500-v.w850):0;
+  const gust=nn(v.wg)?v.wg:(nn(v.ws)?v.ws:0);
+  return clamp(0.9+0.045*Math.max(0,jet-12)+0.04*Math.max(0,shear-8)+0.06*Math.max(0,gust-4),0.8,6);
+}
+function transparency(v,aod){
+  if(!nn(v.cch)&&!nn(v.rh)) return null;
+  let t=100-0.6*(v.cch||0)-1.2*Math.max(0,(v.rh||0)-70);
+  if(nn(v.rh700)) t-=0.3*Math.max(0,v.rh700-60);
+  if(nn(aod)) t-=80*aod;
+  return clamp(t,0,100);
+}
+// Estimated zenith sky brightness (mag/arcsec²). See "Method".
+const fl=m=>Math.pow(10,-0.4*m), mg=f=>-2.5*Math.log10(f);
+function sqmEst(h,base,cc,rh,aod){
+  if(h.sun>-6||!nn(base)) return null;
+  const c=nn(cc)?cc/100:0;
+  const nat=fl(21.9);                                   // natural moonless sky (airglow+zodiacal+starlight)
+  const art=Math.max(0,fl(base)-nat);                   // artificial light-pollution part of the baseline
+  const scat=(1+0.01*Math.max(0,(rh??70)-70))*(1+2*Math.max(0,(aod??0.1)-0.1));
+  const tw=h.sun>-18?fl(21.9-0.82*(h.sun+18))-nat:0;     // twilight excess
+  let mo=0;
+  if(h.moon.alt>0){
+    const pa=Math.acos(clamp(2*h.moon.illum-1,-1,1))*deg; // phase angle
+    const ph=Math.pow(10,-0.4*(0.026*pa+4e-9*Math.pow(pa,4)));
+    mo=fl(18.1)*ph*Math.pow(Math.sin(h.moon.alt*rad),0.8)*(1+2*(aod??0.1));
+  }
+  const tot=nat*(1-0.7*c)+art*scat*(1+3*c)+(tw+mo)*(1-0.3*c);
+  return mg(tot);
+}
+// SQM → Bortle (common approximate conversion)
+function bortle(m){if(!nn(m))return null;const t=[21.99,21.89,21.69,20.49,19.50,18.94,18.38,17.80];for(let i=0;i<t.length;i++)if(m>=t[i])return i+1;return 9}
+// Fog risk 0-100: model visibility if given, else near-saturation + light wind
+function fogRisk(v){
+  let r=null;
+  if(nn(v.vis)) r=v.vis<1000?100:v.vis<2000?70:v.vis<5000?35:0;
+  if(nn(v.spread)){const w=nn(v.ws)?v.ws:2;
+    const q=v.spread<=0.5&&w<3?80:v.spread<=1&&w<4?50:v.spread<=2?20:0; r=Math.max(r??0,q)}
+  return r;
+}
+const fogTxt=v=>!nn(v)?"–":v>=70?"high":v>=35?"moderate":"low";
+// Seeing → 1..5 class (5 best) with plain-language label
+const SEE=[[1.2,5,"Excellent","planets: push magnification"],[1.7,4,"Good","planets: go"],[2.3,3,"Average","planets OK ~200×"],[3.0,2,"Poor","deep-sky only"],[99,1,"Bad","deep-sky, low power"]];
+const TRA=[[80,5,"Excellent","faint galaxies & nebulae"],[65,4,"Good","DSOs: go"],[50,3,"Average","bright DSOs"],[35,2,"Poor","moon, planets, doubles"],[-1,1,"Bad","bright targets only"]];
+const traCls=t=>nn(t)?TRA.find(r=>t>=r[0]):null;
+const seeCls=a=>nn(a)?SEE.find(r=>a<r[0]):null;
+const seeingGood=a=>nn(a)?clamp((3.5-a)/2.5,0,1):null; // 1.0"→1, 3.5"→0
+function score(c){
+  if(!nn(c.cc)) return null;
+  const sg=nn(c.seeing)?seeingGood(c.seeing)*100:50, tr=nn(c.transp)?c.transp:50;
+  let s=0.65*(100-c.cc)+0.2*tr+0.15*sg; if(c.cc>70) s=Math.min(s,20);
+  return clamp(s,0,100);
+}
+
+// ---------- build ----------
+async function load(){
+  const p=presets[cur]; selIdx=null;
+  document.getElementById("locname").textContent=p.name;
+  document.getElementById("loccoord").textContent=`${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° · site SQM ${p.sqm} (Bortle ${bortle(p.sqm)})`;
+  setStatus("Fetching models…");
+  const [res,aq]=await Promise.all([Promise.all(MODELS.map(m=>fetchModel(m,p))),fetchAQ(p)]);
+  const ok=res.filter(Boolean);
+  if(!ok.length){setStatus('<span class="err">No model data could be fetched. Check your connection. This page must be opened as a file or from your own web host, because embedded/sandboxed viewers block outside requests.</span>');return}
+  loadedModels=ok.map(o=>o.m);
+  
+  const base=ok[0].j, off=base.utc_offset_seconds||0, times=base.hourly.time;
+  const aqIdx={}; if(aq) aq.hourly.time.forEach((t,i)=>aqIdx[t]=i);
+  const nowMs=Date.now();
+  H=[];
+  times.forEach((t,i)=>{
+    const utc=Date.parse(t+":00Z")-off*1000;
+    if(utc<nowMs-3600e3) return;
+    const h={t,utc,sun:sunAlt(utc,p.lat,p.lon),moon:moonInfo(utc,p.lat,p.lon),m:{}};
+    const ai=aqIdx[t]; h.aod=(aq&&ai!=null)?aq.hourly.aerosol_optical_depth[ai]:null; h.dust=(aq&&ai!=null)?aq.hourly.dust[ai]:null;
+    for(const o of ok){
+      const hh=o.j.hourly, k=o.j.hourly.time.indexOf(t); if(k<0) continue;
+      const g=n=>hh[n]?hh[n][k]:null;
+      const v={cc:g("cloud_cover"),ccl:g("cloud_cover_low"),ccm:g("cloud_cover_mid"),cch:g("cloud_cover_high"),
+        rh:g("relative_humidity_2m"),td:g("dew_point_2m"),tt:g("temperature_2m"),ws:g("wind_speed_10m"),wg:g("wind_gusts_10m"),
+        pr:g("precipitation"),vis:g("visibility"),w200:g("wind_speed_200hPa"),w250:g("wind_speed_250hPa"),w500:g("wind_speed_500hPa"),
+        w850:g("wind_speed_850hPa"),rh700:g("relative_humidity_700hPa")};
+      v.jet=(nn(v.w200)||nn(v.w250))?Math.max(v.w200??-1,v.w250??-1):null;
+      v.spread=(nn(v.tt)&&nn(v.td))?v.tt-v.td:null;
+      v.fog=fogRisk(v);
+      v.seeing=seeingArcsec(v); v.transp=transparency(v,h.aod);
+      h.m[o.m.key]=v;
+    }
+    const all=Object.values(h.m), med=f=>median(all.map(f));
+    h.c={cc:med(v=>v.cc),ccl:med(v=>v.ccl),ccm:med(v=>v.ccm),cch:med(v=>v.cch),rh:med(v=>v.rh),spread:med(v=>v.spread),
+      tt:med(v=>v.tt),fog:med(v=>v.fog),ws:med(v=>v.ws),wg:med(v=>v.wg),jet:med(v=>v.jet),seeing:med(v=>v.seeing),transp:med(v=>v.transp),pr:med(v=>v.pr),
+      ccsd:sd(all.map(v=>v.cc))};
+    h.c.score=score(h.c);
+    h.c.sqm=sqmEst(h,p.sqm,h.c.cc,h.c.rh,h.aod);
+    h.sqmClear=sqmEst(h,p.sqm,0,h.c.rh,h.aod);
+    H.push(h);
+  });
+  const ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+  setStatus(`Updated ${ts} · ${ok.length}/${MODELS.length} models · CAMS aerosols ${aq?"✓":"✗"}`);
+  renderTonight(); renderGrid();
+}
+function setStatus(h){document.getElementById("status").innerHTML=h}
+
+// ---------- tonight summary ----------
+function hhmm(t){return t.slice(11,16)}
+function renderTonight(){
+  const p=presets[cur], el=document.getElementById("tonight");
+  // first contiguous block with sun < -12
+  let s=H.findIndex(h=>h.sun<-12);
+  if(s<0){el.innerHTML='<div class="verdict no">No astronomical night in range</div>';return}
+  let e=s; while(e+1<H.length&&H[e+1].sun<-12) e++;
+  const night=H.slice(s,e+1);
+  const dark=night.filter(h=>h.sun<-18).length?night.filter(h=>h.sun<-18):night;
+  // dusk/dawn at 10-min resolution
+  const findCross=(a,b,thr)=>{for(let ms=a;ms<=b;ms+=6e5){if((sunAlt(ms,p.lat,p.lon)<thr)!==(sunAlt(a,p.lat,p.lon)<thr))return ms}return null};
+  const off=(Date.parse(H[0].t+":00Z")-H[0].utc);
+  const fmt=ms=>ms==null?"–":new Date(ms+off).toISOString().slice(11,16);
+  const n0ms=night[0].utc-3600e3, n1ms=night[night.length-1].utc+3600e3;
+  const dusk=findCross(n0ms,night[0].utc+3*3600e3,-18), dawn=findCross(night[night.length-1].utc-3*3600e3,n1ms,-18);
+  // moon events within night
+  let mtxt="", prevUp=null, events=[];
+  for(let ms=night[0].utc;ms<=night[night.length-1].utc;ms+=6e5){
+    const up=moonInfo(ms,p.lat,p.lon).alt>0; if(prevUp!=null&&up!==prevUp) events.push((up?"rises ":"sets ")+fmt(ms)); prevUp=up;
+  }
+  const mi=moonInfo(night[0].utc,p.lat,p.lon);
+  const anyUp=night.some(h=>h.moon.alt>0);
+  mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
+  // best window
+  let best=null,run=null;
+  night.forEach((h,i)=>{if(nn(h.c.score)&&h.c.score>=60){if(!run)run={a:i,b:i};else run.b=i}else{if(run&&(!best||run.b-run.a>best.b-best.a))best=run;run=null}});
+  if(run&&(!best||run.b-run.a>best.b-best.a))best=run;
+  const maxS=Math.max(...night.map(h=>h.c.score??0));
+  let vcls,vtxt;
+  if(best){vcls="go";vtxt=`Go: ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t.replace(/T(\d\d)/,(m,x)=>"T"+String((+x+1)%24).padStart(2,"0")))} looks clear`}
+  else if(maxS>=40){vcls="maybe";vtxt="Marginal: gaps possible, watch the radar"}
+  else {vcls="no";vtxt="No-go: clouded out"}
+  const M=f=>median(dark.map(h=>h.c[f]));
+  const agree=median(dark.map(h=>h.c.ccsd));
+  const agreeTxt=!nn(agree)?"–":agree<12?"good":agree<25?"fair":"poor";
+  const minT=Math.min(...night.map(h=>h.c.tt).filter(nn));
+  const minSp=Math.min(...night.map(h=>h.c.spread).filter(nn));
+  const dewTxt=!isFinite(minSp)?"–":minSp<1.5?"high":minSp<3?"moderate":"low";
+  const seeing=M("seeing");
+  const nightDate=new Date(night[0].utc+off).toISOString().slice(0,10);
+  el.innerHTML=`
+    <div class="mut small">Night of ${nightDate} · astro dark ${fmt(dusk)}–${fmt(dawn)} · Moon ${mtxt}</div>
+    <div class="verdict ${vcls}">${vtxt}</div>
+    <div class="kpis">
+      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud</span></div>
+      <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog risk</span></div>
+      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
+      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>transparency · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
+      <div class="kpi"><b>${(()=>{const v=night.map(h=>h.c.sqm).filter(nn);return v.length?Math.max(...v).toFixed(1)+" · B"+bortle(Math.max(...v)):"–"})()}</b><span>best SQM · Bortle</span></div>
+      <div class="kpi"><b>${dewTxt} · ${n0(M("rh"))}%</b><span>dew risk · humidity<br>coldest tonight ${isFinite(minT)?minT.toFixed(0):"–"} °C</span></div>
+    </div>`;
+}
+
+// ---------- grid ----------
+function mix(a,b,t){const pa=a.match(/\w\w/g).map(x=>parseInt(x,16)),pb=b.match(/\w\w/g).map(x=>parseInt(x,16));
+  return "#"+pa.map((x,i)=>Math.round(x+(pb[i]-x)*t).toString(16).padStart(2,"0")).join("")}
+function goodColor(g){ // g: 0 bad .. 1 good
+  if(!nn(g)) return null;
+  g=clamp(g,0,1);
+  return g<0.5?mix("e6e9ef","8fa9dc",g*2):mix("8fa9dc","1f4fd6",(g-0.5)*2);
+}
+function darkColor(h){
+  const s=h.sun;
+  let c=s>0?"f2c94c":s>-6?"b07a35":s>-12?"3d4f7d":s>-18?"1b2440":"000000";
+  if(s<-6&&h.moon.alt>0){const k=clamp(h.moon.illum*Math.sin(h.moon.alt*rad)*1.4+0.15,0,0.85);c=mix(c,"9aa3b2",k)}
+  return "#"+c;
+}
+const ROWS=[
+  {lab:"Dark / moon",dark:true},
+  {lab:"Low cloud",f:h=>h.c.ccl,good:v=>1-v/100,txt:v=>Math.round(v)},
+  {lab:"Mid cloud",f:h=>h.c.ccm,good:v=>1-v/100,txt:v=>Math.round(v)},
+  {lab:"High cloud",f:h=>h.c.cch,good:v=>1-v/100,txt:v=>Math.round(v)},
+  {lab:"Fog",f:h=>h.c.fog,good:v=>1-v/100,txt:v=>v>=70?"F":v>=35?"f":""},
+  {lab:"Seeing 1–5",f:h=>h.c.seeing,good:v=>(seeCls(v)[1]-1)/4,txt:v=>seeCls(v)[1]},
+  {lab:"Transp. 1–5",f:h=>h.c.transp,good:v=>(traCls(v)[1]-1)/4,txt:v=>traCls(v)[1]},
+  {lab:"SQM",f:h=>h.c.sqm,good:v=>(v-17)/4.5,txt:v=>v.toFixed(1)},
+  {lab:"Temp °C",f:h=>h.c.tt,good:()=>null,txt:v=>Math.round(v)},
+  {lab:"Humidity %",f:h=>h.c.rh,good:v=>1-(v-50)/50,txt:v=>Math.round(v)},
+  {lab:"Dew",f:h=>h.c.spread,good:v=>v/6,txt:v=>v<1.5?"D":v<3?"d":""},
+];
+function renderGrid(){
+  const cols=H.map((h,i)=>({h,i})).filter(o=>!nightOnly||o.h.sun<-6);
+  let html="<thead><tr><th class='lab'></th>";
+  let lastDay=null;
+  cols.forEach(o=>{const d=o.h.t.slice(0,10);o.newDay=d!==lastDay||(nightOnly&&o.i>0&&H[o.i-1].sun>=-6);lastDay=d});
+  // day header
+  let dh="<tr><th class='lab'></th>";
+  cols.forEach(o=>{const dt=new Date(o.h.t.slice(0,10)+"T12:00Z");
+    dh+=`<th class="${o.newDay?"day dayb":""}">${o.newDay?dt.toLocaleDateString([], {weekday:"short",day:"numeric",timeZone:"UTC"}):""}</th>`});
+  html="<thead>"+dh+"</tr><tr><th class='lab'>local time</th>";
+  cols.forEach(o=>html+=`<th class="${o.newDay?"dayb":""}">${o.h.t.slice(11,13)}</th>`);
+  html+="</tr></thead><tbody>";
+  for(const r of ROWS){
+    if(r.g){html+=`<tr class="group"><td class="lab">${r.g}</td>${cols.map(o=>`<td class="${o.newDay?"dayb":""}"></td>`).join("")}</tr>`;continue}
+    if(r.model&&!loadedModels.some(m=>m.key===r.model)) continue;
+    html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
+    for(const o of cols){
+      const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel");
+      if(r.dark){const c=darkColor(o.h);html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${c}" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°"></td>`;continue}
+      const v=r.f(o.h);
+      if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
+      const g=r.good(v), c=goodColor(g);
+      if(c&&g>0.62)cls.push("lt"); if(!c)cls.push("lt");
+      html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="${c?"background:"+c:""}">${r.txt(v)}</td>`;
+    }
+    html+="</tr>";
+  }
+  html+="</tbody>";
+  const g=document.getElementById("grid"); g.innerHTML=html;
+  document.getElementById("btnNight").style.borderColor=nightOnly?"#6ea8ff":"";
+}
+document.getElementById("grid").addEventListener("click",e=>{
+  const td=e.target.closest("td.cell"); if(!td) return;
+  selIdx=+td.dataset.i; renderGrid(); renderDetail();
+});
+function renderDetail(){
+  const h=H[selIdx]; if(!h) return; const c=h.c;
+  document.getElementById("detail").innerHTML=`<b>${h.t.slice(5).replace("T"," ")}</b> · cloud L/M/H ${n0(c.ccl)}/${n0(c.ccm)}/${n0(c.cch)}% · fog ${fogTxt(c.fog)} · seeing ${nn(c.seeing)?seeCls(c.seeing)[2].toLowerCase()+" ("+seeCls(c.seeing)[1]+"/5, ≈"+c.seeing.toFixed(1)+'")':"–"} · transparency ${nn(c.transp)?traCls(c.transp)[2].toLowerCase()+" ("+traCls(c.transp)[1]+"/5)":"–"} · SQM ${n0(c.sqm,1)} (B${bortle(c.sqm)??"–"}) · humidity ${n0(c.rh)}% · dew Δ ${n0(c.spread,1)} °C · ${n0(c.tt)} °C · moon ${h.moon.alt>0?"up "+Math.round(h.moon.illum*100)+"%":"down"}`;
+}
+
+// ---------- UI ----------
+function fillPresets(){
+  const s=document.getElementById("preset");
+  s.innerHTML=presets.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("")+`<option value="new">+ New location…</option>`;
+  s.value=cur;
+}
+document.getElementById("preset").onchange=e=>{
+  if(e.target.value==="new"){openDlg(null);e.target.value=cur;return}
+  cur=+e.target.value; store.set("cur",cur); load();
+};
+let editing=null;
+function openDlg(i){
+  editing=i; const p=i==null?{name:"",lat:"",lon:"",sqm:19.5}:presets[i];
+  fName.value=p.name; fLat.value=p.lat; fLon.value=p.lon; fSqm.value=p.sqm;
+  document.getElementById("fDel").style.visibility=(i==null||presets.length<2)?"hidden":"visible";
+  document.getElementById("dlg").showModal();
+}
+const fSqm=document.getElementById("fSqm"),fName=document.getElementById("fName"),fLat=document.getElementById("fLat"),fLon=document.getElementById("fLon");
+document.getElementById("btnEdit").onclick=()=>openDlg(cur);
+document.getElementById("fCancel").onclick=()=>document.getElementById("dlg").close();
+document.getElementById("fDel").onclick=()=>{presets.splice(editing,1);cur=0;store.set("presets",presets);store.set("cur",cur);fillPresets();document.getElementById("dlg").close();load()};
+document.getElementById("locform").onsubmit=e=>{
+  e.preventDefault();
+  const p={name:fName.value.trim()||"Location",lat:clamp(+fLat.value,-90,90),lon:clamp(+fLon.value,-180,180),sqm:clamp(+fSqm.value,16,22.2)};
+  if(editing==null){presets.push(p);cur=presets.length-1}else{presets[editing]=p;cur=editing}
+  store.set("presets",presets);store.set("cur",cur);fillPresets();document.getElementById("dlg").close();load();
+};
+document.getElementById("btnLocate").onclick=()=>{
+  if(!navigator.geolocation){setStatus('<span class="err">Geolocation unavailable. Enter coordinates with ✎.</span>');return}
+  setStatus("Locating…");
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=+pos.coords.latitude.toFixed(3),lon=+pos.coords.longitude.toFixed(3);
+    const i=presets.findIndex(p=>p.name==="My location"); const p={name:"My location",lat,lon,sqm:(presets.find(q=>q.name==="My location")||presets[0]).sqm};
+    if(i>=0){presets[i]=p;cur=i}else{presets.push(p);cur=presets.length-1}
+    store.set("presets",presets);store.set("cur",cur);fillPresets();load();
+  },err=>setStatus('<span class="err">Location refused or unavailable. Enter coordinates with ✎.</span>'),{timeout:15000});
+};
+document.getElementById("btnNight").onclick=()=>{nightOnly=!nightOnly;store.set("nightOnly",nightOnly);renderGrid()};
+document.getElementById("btnRed").onclick=()=>{red=!red;store.set("red",red);document.body.classList.toggle("red",red)};
+document.getElementById("btnReload").onclick=load;
+document.body.classList.toggle("red",red);
+fillPresets(); load();
+</script>
+</body>
+</html>
