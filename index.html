@@ -366,7 +366,7 @@ function renderTonight(){
   // summarise the best clear window if there is one, else all dark hours
   const win=best?night.slice(best.a,best.b+1):dark;
   const M=f=>median(win.map(h=>h.c[f]));
-  const winTxt=best?`for ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t)}h`:"whole night";
+  const winTxt=best?`${hhmm(night[best.a].t)}–${String((+night[best.b].t.slice(11,13)+1)%24).padStart(2,"0")}:00`:"whole night";
   const agree=median(dark.map(h=>h.c.ccsd));
   const agreeTxt=!nn(agree)?"–":agree<12?"good":agree<25?"fair":"poor";
   const minT=Math.min(...night.map(h=>h.c.tt).filter(nn));
