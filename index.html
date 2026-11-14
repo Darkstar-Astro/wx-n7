@@ -363,7 +363,10 @@ function renderTonight(){
   else if(maxS>=40){vcls="maybe";vtxt="Marginal: gaps possible, watch the radar"}
   else {vcls="no";vtxt="No-go: clouded out"}
   if(best&&night.slice(best.a,best.b+1).some(h=>nn(h.c.cch)&&h.c.cch>=30)) vtxt+=" · thin cirrus possible";
-  const M=f=>median(dark.map(h=>h.c[f]));
+  // summarise the best clear window if there is one, else all dark hours
+  const win=best?night.slice(best.a,best.b+1):dark;
+  const M=f=>median(win.map(h=>h.c[f]));
+  const winTxt=best?`for ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t)}h`:"whole night";
   const agree=median(dark.map(h=>h.c.ccsd));
   const agreeTxt=!nn(agree)?"–":agree<12?"good":agree<25?"fair":"poor";
   const minT=Math.min(...night.map(h=>h.c.tt).filter(nn));
@@ -376,10 +379,10 @@ function renderTonight(){
     <div class="verdict ${vcls}">${vtxt}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="kpis">
-      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud (high = worst model)</span></div>
+      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud ${winTxt}</span></div>
       <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog risk</span></div>
-      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
-      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>transparency · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
+      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>seeing ${winTxt} · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
+      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>transparency ${winTxt} · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
       <div class="kpi"><b>${(()=>{const v=night.map(h=>h.c.sqm).filter(nn);return v.length?Math.max(...v).toFixed(1)+" · B"+bortle(Math.max(...v)):"–"})()}</b><span>best SQM · Bortle</span></div>
       <div class="kpi"><b>${dewTxt} · ${n0(M("rh"))}%</b><span>dew risk · humidity<br>coldest tonight ${isFinite(minT)?minT.toFixed(0):"–"} °C</span></div>
     </div>`;
