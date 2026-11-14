@@ -78,7 +78,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       <summary>Method & assumptions</summary>
       <div class="small" style="margin-top:8px">
       <p><b>Data.</b> Open-Meteo, fetched live from your browser, one request per model: ECMWF IFS, DWD ICON (seamless: D2→EU→global), Météo-France (AROME→ARPEGE), KNMI Harmonie, UK Met Office, NOAA GFS. Aerosol optical depth comes from CAMS (Open-Meteo air-quality API). A model that is out of domain or returns nothing is left out, and the top-right list shows which ones loaded.</p>
-      <p><b>Consensus.</b> Each metric is the <i>median</i> across the models that loaded. Model agreement is the standard deviation of total cloud cover across models.</p>
+      <p><b>Consensus.</b> Each metric is the <i>median</i> across the models that loaded, except high cloud (worst model, i.e. maximum) and transparency (worst model, i.e. minimum), because models routinely miss or mistime thin cirrus. Model agreement is the standard deviation of total cloud cover across models.</p>
       <p><b>Seeing (a proxy, not a measurement).</b> None of these models outputs seeing. It is estimated per model as<br>
       <code>arcsec = 0.9 + 0.045·max(0, jet−12) + 0.04·max(0, shear−8) + 0.06·max(0, gust−4)</code><br>
       with <code>jet = max(wind 200 hPa, 250 hPa)</code>, <code>shear = |wind 500 − wind 850 hPa|</code> and <code>gust</code> the 10 m gust, all in m/s. It is calibrated loosely to Benelux experience (jet stream above ~30 m/s ≈ poor seeing). It does not account for local ground-layer or tube/mirror effects. Use it for relative ranking between nights, not as an absolute FWHM.</p>
@@ -316,6 +316,8 @@ async function load(){
     h.c={cc:med(v=>v.cc),ccl:med(v=>v.ccl),ccm:med(v=>v.ccm),cch:med(v=>v.cch),rh:med(v=>v.rh),spread:med(v=>v.spread),
       tt:med(v=>v.tt),fog:med(v=>v.fog),ws:med(v=>v.ws),wg:med(v=>v.wg),jet:med(v=>v.jet),seeing:med(v=>v.seeing),transp:med(v=>v.transp),pr:med(v=>v.pr),
       ccsd:sd(all.map(v=>v.cc))};
+    {const hc=all.map(v=>v.cch).filter(nn); h.c.cch=hc.length?Math.max(...hc):null;
+     const tr=all.map(v=>v.transp).filter(nn); h.c.transp=tr.length?Math.min(...tr):null;}
     h.c.score=score(h.c);
     h.c.sqm=sqmEst(h,p.sqm,h.c.cc,h.c.rh,h.aod);
     h.sqmClear=sqmEst(h,p.sqm,0,h.c.rh,h.aod);
@@ -360,6 +362,7 @@ function renderTonight(){
   if(best){vcls="go";vtxt=`Go: ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t.replace(/T(\d\d)/,(m,x)=>"T"+String((+x+1)%24).padStart(2,"0")))} looks clear`}
   else if(maxS>=40){vcls="maybe";vtxt="Marginal: gaps possible, watch the radar"}
   else {vcls="no";vtxt="No-go: clouded out"}
+  if(best&&night.slice(best.a,best.b+1).some(h=>nn(h.c.cch)&&h.c.cch>=30)) vtxt+=" · thin cirrus possible";
   const M=f=>median(dark.map(h=>h.c[f]));
   const agree=median(dark.map(h=>h.c.ccsd));
   const agreeTxt=!nn(agree)?"–":agree<12?"good":agree<25?"fair":"poor";
@@ -372,7 +375,7 @@ function renderTonight(){
     <div class="mut small">Night of ${nightDate} · astro dark ${fmt(dusk)}–${fmt(dawn)} · Moon ${mtxt}</div>
     <div class="verdict ${vcls}">${vtxt}</div>
     <div class="kpis">
-      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud</span></div>
+      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud (high = worst model)</span></div>
       <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog risk</span></div>
       <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
       <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>transparency · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
@@ -399,7 +402,7 @@ const ROWS=[
   {lab:"Dark / moon",dark:true},
   {lab:"Low cloud",f:h=>h.c.ccl,good:v=>1-v/100,txt:v=>Math.round(v)},
   {lab:"Mid cloud",f:h=>h.c.ccm,good:v=>1-v/100,txt:v=>Math.round(v)},
-  {lab:"High cloud",f:h=>h.c.cch,good:v=>1-v/100,txt:v=>Math.round(v)},
+  {lab:"High (max)",f:h=>h.c.cch,good:v=>1-v/100,txt:v=>Math.round(v)},
   {lab:"Fog",f:h=>h.c.fog,good:v=>1-v/100,txt:v=>v>=70?"F":v>=35?"f":""},
   {lab:"Seeing 1–5",f:h=>h.c.seeing,good:v=>(seeCls(v)[1]-1)/4,txt:v=>seeCls(v)[1]},
   {lab:"Transp. 1–5",f:h=>h.c.transp,good:v=>(traCls(v)[1]-1)/4,txt:v=>traCls(v)[1]},
