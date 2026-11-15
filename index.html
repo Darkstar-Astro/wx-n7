@@ -35,6 +35,8 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 .nchip{flex:1 0 82px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-radius:10px;font-size:12px;text-align:left}
 .nchip b{font-size:13px}.nchip svg{vertical-align:-2px}
 .nchip.go{border-color:#2a7f50}.nchip.maybe{border-color:#94701f}.nchip.no{border-color:#3a1d22}
+.nchip .conf{font-size:11px;color:#8a96aa;letter-spacing:1px}
+.nchip.cf0{opacity:.72}
 .nchip.on{background:#1a2333;outline:2px solid #6ea8ff}
 table.g th.best{background:#2a7f50;color:#eafff1;border-radius:4px}
 table.g th.now{color:#ffd76a;font-weight:700}
@@ -109,6 +111,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       with <code>jet = max(wind 200 hPa, 250 hPa)</code>, <code>shear = |wind 500 − wind 850 hPa|</code> and <code>gust</code> the 10 m gust, all in m/s. It is calibrated loosely to Benelux experience (jet stream above ~30 m/s ≈ poor seeing). It does not account for local ground-layer or tube/mirror effects. Use it for relative ranking between nights, not as an absolute FWHM.</p>
       <p><b>Seeing scale.</b> 5 Excellent (&lt;1.2″), 4 Good (1.2–1.7″), 3 Average (1.7–2.3″), 2 Poor (2.3–3″), 1 Bad (&gt;3″). The arcsecond value is the estimated star blur. Typical good nights in Belgium are 3–4.</p>
       <p><b>Transparency (0–100).</b> <code>100 − 0.6·high cloud − 1.2·max(0, RH₂ₘ−70) − 0.3·max(0, RH₇₀₀−60) − 80·AOD</code>. High cloud is penalised because thin cirrus ruins transparency even when the total cloud figure looks low. Low and mid cloud already count in the cloud rows.</p>
+      <p><b>Confidence</b> per night: high within ~30 h, medium up to ~54 h, low beyond that. It drops a step when the models disagree on cloud (spread &gt;12%), two steps when they disagree strongly (&gt;25%), and one step if fewer than 3 models loaded. "Partial" means the forecast data ends during that night.</p>
       <p><b>Fog.</b> Uses the model visibility where a model gives it (under 1 km is high risk, under 2 km elevated). Otherwise, a temperature − dew point spread of 0.5 °C or less with wind under 3 m/s counts as high risk. The page shows the median across models.</p>
       <p><b>Transparency scale.</b> 5 Excellent (≥80), 4 Good (65–79), 3 Average (50–64), 2 Poor (35–49), 1 Bad (&lt;35), from the 0–100 formula above.</p>
       <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
@@ -386,6 +389,17 @@ function bestRun(night){
   return best;
 }
 const endHH=t=>String((+t.slice(11,13)+1)%24).padStart(2,"0")+":00";
+// forecast confidence for a night block: lead time + model agreement on cloud
+function nightConf(b){
+  const night=H.slice(b.s,b.e+1), mid=night[Math.floor(night.length/2)].utc;
+  const lead=(mid-Date.now())/3600e3;
+  let c=lead<30?2:lead<54?1:0;
+  const sp=median(night.map(h=>h.c.ccsd));
+  if(nn(sp)) c-=sp>25?2:sp>12?1:0;
+  if(loadedModels.length<3) c-=1;
+  c=clamp(c,0,2);
+  return {c,txt:["low","medium","high"][c],dots:["●○○","●●○","●●●"][c],partial:b.e===H.length-1};
+}
 function renderNights(){
   const el=document.getElementById("nights"),p=presets[cur],bl=nightBlocks();
   if(!bl.length){el.innerHTML="";return}
@@ -394,7 +408,8 @@ function renderNights(){
     const v=best?["go","✅",`${night[best.a].t.slice(11,13)}–${endHH(night[best.b].t).slice(0,2)}h`]:maxS>=40?["maybe","⚠️","gaps"]:["no","❌","cloudy"];
     const m=moonInfo(night[0].utc,p.lat,p.lon);
     const d=new Date(night[0].t.slice(0,10)+"T12:00Z").toLocaleDateString([], {weekday:"short",day:"numeric",timeZone:"UTC"});
-    return `<button class="nchip ${v[0]}${k===nightSel?" on":""}" data-n="${k}"><b>${d}</b><span>${v[1]} ${v[2]}</span><span class="mut">${moonSVG(m.illum,m.waxing,14)} ${Math.round(m.illum*100)}%</span></button>`;
+    const cf=nightConf(b);
+    return `<button class="nchip ${v[0]}${k===nightSel?" on":""} cf${cf.c}" data-n="${k}"><b>${d}</b><span>${v[1]} ${v[2]}</span><span class="mut">${moonSVG(m.illum,m.waxing,14)} ${Math.round(m.illum*100)}%</span><span class="conf">${cf.dots}${cf.partial?" partial":""}</span></button>`;
   }).join("");
 }
 function renderTonight(){
@@ -479,6 +494,7 @@ function renderTonight(){
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
+    <div class="small mut">Forecast confidence: ${(()=>{const cf=nightConf(bl[nightSel]);return `<b style="color:${["#c98a8f","#d9a640","#7fd18b"][cf.c]}">${cf.txt}</b> ${cf.dots}`+(cf.partial?" · forecast data ends mid-night (partial)":"")})()}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
     <div class="kpis">
