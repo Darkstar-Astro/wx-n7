@@ -29,7 +29,6 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
 .moonrow{display:flex;gap:10px;align-items:center;margin:8px 0 4px;font-size:14px}
 .moonrow .ev{font-weight:650;margin-left:6px;white-space:nowrap}
-.moonrow .glow{color:#e8d9a8}
 .moonrow .free{color:#9fc2ff;font-weight:600}
 .nights{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px}
 .nchip{flex:1 0 82px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-radius:10px;font-size:12px;text-align:left}
@@ -97,7 +96,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
   <div class="card" id="tonight"></div>
   <button id="btnLegend" class="small" style="margin:4px 0 6px;padding:3px 9px">ⓘ Legend</button>
   <div id="legend" class="legend" style="margin:0 0 6px;display:none"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew <br>
-    Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: ☾ up, ☾m noticeable, ☾M strong glow, blank = down</div>
+    Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: ☾ = up (lighter = fuller), blank = down</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -117,8 +116,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
       <p><b>Score (0–100).</b> <code>0.65·(100−cloud) + 0.2·transparency + 0.15·seeing (scaled)</code>, capped at 20 when cloud is over 70%. The moon does not count toward the score (it matters for DSOs but not for planets). It shows in the Darkness row.</p>
       <p><b>SQM (estimate).</b> No model forecasts sky brightness. It starts from the location's <i>baseline SQM</i> (clear, moonless, astro-dark zenith), which you set with ✎. Defaults: Aalst 19.0 (measured median, Unihedron SQM). Lesse (Redu) 21.1 and Grandpré 21.5 are derived from lightpollutionmap.app (Bortle 4.4 and 3.6), so replace them with your SQM readings. Replace them with your own meter reading or the World Atlas value from lightpollutionmap.info. The baseline is split into natural sky (21.9) and artificial light. Light pollution is scaled up by humidity above 70%, by AOD above 0.1, and by cloud (×(1+3·cloud), because clouds reflect city light back down). Natural sky is dimmed by cloud. Twilight adds <code>21.9−0.82·(sun alt+18)</code> mag above −18°. The moon adds a term that reaches about 18.1 mag/arcsec² for a full moon at 60° altitude, scaled by the standard phase law and by sin(alt)<sup>0.8</sup>, and boosted by aerosols. Expect ±0.3–0.5 mag. "SQM if clear" shows what the sky would read with zero cloud, which is useful when the clouds are uncertain.</p>
-      <p><b>Moon glow</b> is how many magnitudes the moon brightens the zenith at this site on a clear night: SQM without the moon minus SQM with it. The thresholds are 0.3 mag (slight: aim away from the moon), 0.7 mag (choose brighter targets) and 1.5 mag (strong). The glow is judged for a typical target 30–45° from the moon, where the moonlight is about twice what it is at the zenith (Krisciunas &amp; Schaefer scattering). The SQM row stays a zenith value, comparable with your meter. Humidity above 70% boosts scattered moonlight, just as it does city light. It is site-dependent: in a light-polluted town the moon adds relatively little, while at a dark site the same moon costs much more.</p>
-      <p><b>Bortle</b> is converted from SQM with the common approximate table: ≥21.99 → 1, 21.89 → 2, 21.69 → 3, 20.49 → 4, 19.50 → 5, 18.94 → 6, 18.38 → 7, 17.80 → 8, below that 9. Bortle is really a visual scale, so this is a rough equivalent. The hourly row shows how much the moon, twilight and cloud degrade the site that night.</p>
+            <p><b>Bortle</b> is converted from SQM with the common approximate table: ≥21.99 → 1, 21.89 → 2, 21.69 → 3, 20.49 → 4, 19.50 → 5, 18.94 → 6, 18.38 → 7, 17.80 → 8, below that 9. Bortle is really a visual scale, so this is a rough equivalent. The hourly row shows how much the moon, twilight and cloud degrade the site that night.</p>
       <p><b>Sun and moon.</b> Computed locally from low-precision ephemerides (about 0.5° accuracy, with a topocentric moon-parallax correction). Darkness row colours run from day to civil, nautical and astronomical twilight to astro-dark. Grey means the moon is up, and a brighter grey means a brighter moon.</p>
       <p><b>Times</b> are local to the selected location.</p>
       </div>
@@ -286,7 +284,7 @@ function sqmEst(h,base,cc,rh,aod){
   if(h.moon.alt>0){
     const pa=Math.acos(clamp(2*h.moon.illum-1,-1,1))*deg; // phase angle
     const ph=Math.pow(10,-0.4*(0.026*pa+4e-9*Math.pow(pa,4)));
-    mo=fl(18.1)*ph*Math.pow(Math.sin(h.moon.alt*rad),0.8)*(1+2*(aod??0.1))*(1+0.01*Math.max(0,(rh??70)-70))*(h.glowX||1); // haze scatters moonlight like city light; glowX: sky nearer the moon
+    mo=fl(18.1)*ph*Math.pow(Math.sin(h.moon.alt*rad),0.8)*(1+2*(aod??0.1))*(1+0.01*Math.max(0,(rh??70)-70)); // haze scatters moonlight like city light
   }
   const tot=nat*(1-0.7*c)+art*scat*(1+3*c)+(tw+mo)*(1-0.3*c);
   return mg(tot);
@@ -357,7 +355,6 @@ async function load(){
     h.c.score=score(h.c);
     h.c.sqm=sqmEst(h,p.sqm,h.c.cc,h.c.rh,h.aod);
     h.sqmClear=sqmEst(h,p.sqm,0,h.c.rh,h.aod);
-    {const nm=sqmEst({...h,moon:{alt:-90,illum:0}},p.sqm,0,h.c.rh,h.aod); const wm=sqmEst({...h,glowX:2},p.sqm,0,h.c.rh,h.aod); h.glow=(nn(nm)&&nn(wm)&&h.sun<-6)?Math.max(0,nm-wm):null;}
     H.push(h);
   });
   const ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
@@ -450,18 +447,6 @@ function renderTonight(){
   }
   const longest=spans.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
   const freeTxt=!longest?"none: moon up all night":(longest[0]===dusk&&longest[1]===dawn)?`all night ${fmt(dusk)}–${fmt(dawn)}`:`${fmt(longest[0])}–${fmt(longest[1])}`;
-  // moon glow spans during astro dark (10-min steps), using tonight's median humidity/aerosols
-  const rhN=median(night.map(h=>h.c.rh)), aodN=median(night.map(h=>h.aod));
-  const glowAt=ms=>{const hh={sun:-30,moon:moonInfo(ms,p.lat,p.lon),glowX:2};const a=sqmEst(hh,p.sqm,0,rhN,aodN),b=sqmEst({sun:-30,moon:{alt:-90,illum:0}},p.sqm,0,rhN,aodN);return b-a};
-  const spanOf=thr=>{let a=null,b=null,pk=0;if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5){const g=glowAt(ms);pk=Math.max(pk,g);if(g>=thr){if(a==null)a=ms;b=ms}}return {a,b,pk}};
-  const gS=spanOf(0.3), gN=spanOf(0.7), gX=spanOf(1.5);
-  const dirAt=ms=>moonAz(ms,p.lat,p.lon);
-  const upDark=(()=>{let u=[];if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5)if(moonInfo(ms,p.lat,p.lon).alt>0)u.push(ms);return u})();
-  const upTxt=!upDark.length?"":upDark[0]===dusk&&upDark.at(-1)+6e5>dawn?"up all night":upDark[0]===dusk?`up until ${fmt(upDark.at(-1))}`:`up from ${fmt(upDark[0])}`;
-  const glowTxt=gS.a==null?"":
-    gN.a==null?`Slight moon glow ${fmt(gS.a)}–${fmt(gS.b)} (moon low in the ${dirAt(gS.a)}): favour targets away from it`:
-    gX.a==null?`Moon glow ${fmt(gN.a)}–${fmt(gN.b)} (moon in the ${dirAt(gN.a)}): choose brighter targets then`:
-    `Strong moon glow ${fmt(gX.a)}–${fmt(gX.b)} (moon in the ${dirAt(gX.a)}): moon, planets & doubles then`;
   const freeH=longest?((longest[1]-longest[0])/3600e3).toFixed(1):0;
   const anyUp=night.some(h=>h.moon.alt>0);
   mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
@@ -490,7 +475,6 @@ function renderTonight(){
     <div class="moonrow">
       ${moonSVG(mi.illum,mi.waxing)}
       <div><b>${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"}</b> ${rsTxt}<br>
-      ${glowTxt?`<span class="glow">🌕 ${glowTxt}</span><br>`:""}
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
@@ -524,7 +508,7 @@ function darkColor(h){
 const L3=(v,g,m,lowerIsBetter=true)=>lowerIsBetter?(v<=g?2:v<=m?1:0):(v>=g?2:v>=m?1:0);
 const ROWS=[
   {lab:"Darkness",dark:true},
-  {lab:"Moon",f:h=>h.moon.alt>0?(h.glow??0):-1,lvl:v=>v<0?null:L3(v,0.29,1.49),txt:v=>v<0?"":v>=1.5?"☾M":v>=0.7?"☾m":"☾"},
+  {lab:"Moon",moon:true},
   {lab:"Low cloud",f:h=>h.c.ccl,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"Mid cloud",f:h=>h.c.ccm,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"High (max)",f:h=>h.c.cch,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
@@ -556,6 +540,7 @@ function renderGrid(){
     html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
     for(const o of cols){
       const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel"); if(o.i===nowIdx)cls.push("nowc");
+      if(r.moon){const up=o.h.moon.alt>0,k=o.h.moon.illum;html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="${up?`background:#${mix("2a3140","c9cfd9",k)};color:${k>0.55?"#141922":"#e9eefb"}`:""}" title="moon ${o.h.moon.alt.toFixed(0)}°, ${Math.round(k*100)}%">${up?"☾":""}</td>`;continue}
       if(r.dark){const c=darkColor(o.h),sym=o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
