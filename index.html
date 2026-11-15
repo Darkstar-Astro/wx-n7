@@ -566,7 +566,7 @@ document.getElementById("grid").addEventListener("click",e=>{
 });
 function renderDetail(){
   const h=H[selIdx]; if(!h) return; const c=h.c;
-  document.getElementById("detail").innerHTML=`<b>${h.t.slice(5).replace("T"," ")}</b> · cloud L/M/H ${n0(c.ccl)}/${n0(c.ccm)}/${n0(c.cch)}% · fog ${fogTxt(c.fog)} · seeing ${nn(c.seeing)?seeCls(c.seeing)[2].toLowerCase()+" ("+seeCls(c.seeing)[1]+"/5, ≈"+c.seeing.toFixed(1)+'")':"–"} · transparency ${nn(c.transp)?traCls(c.transp)[2].toLowerCase()+" ("+traCls(c.transp)[1]+"/5)":"–"} · SQM ${n0(c.sqm,1)} (B${bortle(c.sqm)??"–"}) · humidity ${n0(c.rh)}% · dew Δ ${n0(c.spread,1)} °C · ${n0(c.tt)} °C · moon ${h.moon.alt>0?Math.round(h.moon.illum*100)+"% · "+moonAz(h.utc,presets[cur].lat,presets[cur].lon)+" "+Math.round(h.moon.alt)+"°":"down"}`;
+  document.getElementById("detail").innerHTML=`<b>${h.t.slice(5).replace("T"," ")}</b> · cloud L/M/H ${n0(c.ccl)}/${n0(c.ccm)}/${n0(c.cch)}% · fog ${fogTxt(c.fog)} · seeing ${nn(c.seeing)?seeCls(c.seeing)[2].toLowerCase()+" ("+seeCls(c.seeing)[1]+"/5, ≈"+c.seeing.toFixed(1)+'")':"–"} · transparency ${nn(c.transp)?traCls(c.transp)[2].toLowerCase()+" ("+traCls(c.transp)[1]+"/5)":"–"} · SQM ${n0(c.sqm,1)} (B${bortle(c.sqm)??"–"}) · humidity ${n0(c.rh)}% · dew Δ ${n0(c.spread,1)} °C · ${n0(c.tt)} °C · moon ${h.moon.alt>0?Math.round(h.moon.illum*100)+"% · "+moonAz(h.utc,presets[cur].lat,presets[cur].lon):"down"}`;
 }
 
 // ---------- UI ----------
