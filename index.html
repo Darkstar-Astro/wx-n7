@@ -72,7 +72,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
   <h1><span id="locname">—</span><small id="loccoord"></small></h1>
   <select id="preset" title="Location"></select>
   <button id="btnLocate" title="Use my location">📍</button>
-  <button id="btnEdit" title="Edit / save location">✎</button>
+  <button id="btnEdit" title="Edit this location">✎ Edit</button>
   <button id="btnNight" title="Show night hours only">🌙 Night</button>
   <button id="btnRed" title="Red-light mode">🔴</button>
   <button id="btnReload" title="Reload">↻</button>
@@ -112,9 +112,10 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
   <form method="dialog" id="locform">
     <h3 style="margin-top:0">Location</h3>
     <label>Name</label><input id="fName" required>
-    <label>Latitude (°N, negative = S)</label><input id="fLat" type="number" step="any" required>
-    <label>Longitude (°E, negative = W)</label><input id="fLon" type="number" step="any" required>
-    <label>Baseline SQM: clear, moonless, astro-dark zenith (mag/arcsec²). Use your own meter reading or the lightpollutionmap.info value.</label><input id="fSqm" type="number" step="0.01" min="16" max="22.2" required>
+    <label>Latitude (°N, negative = S)</label><input id="fLat" type="text" inputmode="decimal" autocomplete="off" required>
+    <label>Longitude (°E, negative = W)</label><input id="fLon" type="text" inputmode="decimal" autocomplete="off" required>
+    <label>Baseline SQM: clear, moonless, astro-dark zenith (mag/arcsec²). Use your own meter reading or the lightpollutionmap.info value.</label><input id="fSqm" type="text" inputmode="decimal" autocomplete="off" required>
+    <div id="fErr" class="err small" style="margin-top:6px"></div>
     <div class="row" style="margin-top:12px;justify-content:space-between">
       <button type="button" id="fDel">Delete preset</button>
       <div class="row"><button type="button" id="fCancel">Cancel</button><button type="submit">Save & use</button></div>
@@ -523,7 +524,7 @@ document.getElementById("preset").onchange=e=>{
 let editing=null;
 function openDlg(i){
   editing=i; const p=i==null?{name:"",lat:"",lon:"",sqm:19.5}:presets[i];
-  fName.value=p.name; fLat.value=p.lat; fLon.value=p.lon; fSqm.value=p.sqm;
+  fName.value=p.name; fLat.value=p.lat; fLon.value=p.lon; fSqm.value=p.sqm; document.getElementById("fErr").textContent="";
   document.getElementById("fDel").style.visibility=(i==null||presets.length<2)?"hidden":"visible";
   document.getElementById("dlg").showModal();
 }
@@ -533,7 +534,10 @@ document.getElementById("fCancel").onclick=()=>document.getElementById("dlg").cl
 document.getElementById("fDel").onclick=()=>{presets.splice(editing,1);cur=0;store.set("presets",presets);store.set("cur",cur);fillPresets();document.getElementById("dlg").close();load()};
 document.getElementById("locform").onsubmit=e=>{
   e.preventDefault();
-  const p={name:fName.value.trim()||"Location",lat:clamp(+fLat.value,-90,90),lon:clamp(+fLon.value,-180,180),sqm:clamp(+fSqm.value,16,22.2)};
+  const num=el=>parseFloat(String(el.value).trim().replace(",","."));
+  const lat=num(fLat),lon=num(fLon),sq=num(fSqm);
+  if(!isFinite(lat)||!isFinite(lon)||!isFinite(sq)){document.getElementById("fErr").textContent="Use numbers, e.g. 50.94 or 50,94";return}
+  const p={name:fName.value.trim()||"Location",lat:clamp(lat,-90,90),lon:clamp(lon,-180,180),sqm:clamp(sq,16,22.2)};
   if(editing==null){presets.push(p);cur=presets.length-1}else{presets[editing]=p;cur=editing}
   store.set("presets",presets);store.set("cur",cur);fillPresets();document.getElementById("dlg").close();load();
 };
