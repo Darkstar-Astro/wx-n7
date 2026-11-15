@@ -60,6 +60,7 @@ table.g td.cell.lt{color:#e9eefb}
 table.g td.cell.l2{background:#2a7f50;color:#eafff1}
 table.g td.cell.l1{background:#94701f;color:#140e03}
 table.g td.cell.l0{background:#3a1d22;color:#b0737a}
+table.g .mdir{font-size:9px;line-height:1;color:#e8dcb8;margin-top:1px}
 table.g td.sel{outline:2px solid #ffd76a;outline-offset:-2px}
 table.g tr.group td.lab{color:var(--acc);font-weight:600;padding-top:6px}
 #detail table{border-collapse:collapse;width:100%;font-size:12.5px}
@@ -96,7 +97,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
   <div class="card" id="tonight"></div>
   <button id="btnLegend" class="small" style="margin:4px 0 6px;padding:3px 9px">ⓘ Legend</button>
   <div id="legend" class="legend" style="margin:0 0 6px;display:none"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew <br>
-    Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: phase icon = moon up, blank = down</div>
+    Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: phase icon + direction when up, blank = down</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -540,7 +541,7 @@ function renderGrid(){
     html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
     for(const o of cols){
       const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel"); if(o.i===nowIdx)cls.push("nowc");
-      if(r.moon){const up=o.h.moon.alt>0;html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${darkColor(o.h)}" title="moon ${o.h.moon.alt.toFixed(0)}°, ${Math.round(o.h.moon.illum*100)}%">${up?moonSVG(o.h.moon.illum,o.h.moon.waxing,15):""}</td>`;continue}
+      if(r.moon){const up=o.h.moon.alt>0;html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${darkColor(o.h)}" title="moon ${o.h.moon.alt.toFixed(0)}°, ${Math.round(o.h.moon.illum*100)}%">${up?moonSVG(o.h.moon.illum,o.h.moon.waxing,15)+`<div class="mdir">${moonAz(o.h.utc,presets[cur].lat,presets[cur].lon)}</div>`:""}</td>`;continue}
       if(r.dark){const c=darkColor(o.h),sym=o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
@@ -565,7 +566,7 @@ document.getElementById("grid").addEventListener("click",e=>{
 });
 function renderDetail(){
   const h=H[selIdx]; if(!h) return; const c=h.c;
-  document.getElementById("detail").innerHTML=`<b>${h.t.slice(5).replace("T"," ")}</b> · cloud L/M/H ${n0(c.ccl)}/${n0(c.ccm)}/${n0(c.cch)}% · fog ${fogTxt(c.fog)} · seeing ${nn(c.seeing)?seeCls(c.seeing)[2].toLowerCase()+" ("+seeCls(c.seeing)[1]+"/5, ≈"+c.seeing.toFixed(1)+'")':"–"} · transparency ${nn(c.transp)?traCls(c.transp)[2].toLowerCase()+" ("+traCls(c.transp)[1]+"/5)":"–"} · SQM ${n0(c.sqm,1)} (B${bortle(c.sqm)??"–"}) · humidity ${n0(c.rh)}% · dew Δ ${n0(c.spread,1)} °C · ${n0(c.tt)} °C · moon ${h.moon.alt>0?"up "+Math.round(h.moon.illum*100)+"%":"down"}`;
+  document.getElementById("detail").innerHTML=`<b>${h.t.slice(5).replace("T"," ")}</b> · cloud L/M/H ${n0(c.ccl)}/${n0(c.ccm)}/${n0(c.cch)}% · fog ${fogTxt(c.fog)} · seeing ${nn(c.seeing)?seeCls(c.seeing)[2].toLowerCase()+" ("+seeCls(c.seeing)[1]+"/5, ≈"+c.seeing.toFixed(1)+'")':"–"} · transparency ${nn(c.transp)?traCls(c.transp)[2].toLowerCase()+" ("+traCls(c.transp)[1]+"/5)":"–"} · SQM ${n0(c.sqm,1)} (B${bortle(c.sqm)??"–"}) · humidity ${n0(c.rh)}% · dew Δ ${n0(c.spread,1)} °C · ${n0(c.tt)} °C · moon ${h.moon.alt>0?Math.round(h.moon.illum*100)+"% · "+moonAz(h.utc,presets[cur].lat,presets[cur].lon)+" "+Math.round(h.moon.alt)+"°":"down"}`;
 }
 
 // ---------- UI ----------
