@@ -27,6 +27,8 @@ button,select,input{background:var(--panel);color:var(--txt);border:1px solid va
 button{cursor:pointer} button:active{transform:scale(.97)}
 main{padding:12px;max-width:1400px;margin:0 auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.moonrow{display:flex;gap:10px;align-items:center;margin:8px 0 4px;font-size:14px}
+.moonrow .free{color:#9fc2ff;font-weight:600}
 .verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
@@ -335,6 +337,15 @@ async function load(){
 }
 function setStatus(h){document.getElementById("status").innerHTML=h}
 
+// ---------- moon phase icon (SVG) ----------
+function moonSVG(k,waxing,size=44){
+  const r=20,c=22,rx=Math.abs(2*k-1)*r;
+  const lit=waxing?`M${c},${c-r} A${r},${r} 0 0 1 ${c},${c+r} A${rx},${r} 0 0 ${k>0.5?1:0} ${c},${c-r}Z`
+                  :`M${c},${c-r} A${r},${r} 0 0 0 ${c},${c+r} A${rx},${r} 0 0 ${k>0.5?0:1} ${c},${c-r}Z`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 44 44" aria-hidden="true">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="#1b2232" stroke="#2c3647"/>
+    ${k>0.01?`<path d="${lit}" fill="#f2e6c4"/>`:""}</svg>`;
+}
 // ---------- tonight summary ----------
 function hhmm(t){return t.slice(11,16)}
 function renderTonight(){
@@ -357,6 +368,18 @@ function renderTonight(){
     const up=moonInfo(ms,p.lat,p.lon).alt>0; if(prevUp!=null&&up!==prevUp) events.push((up?"rises ":"sets ")+fmt(ms)); prevUp=up;
   }
   const mi=moonInfo(night[0].utc,p.lat,p.lon);
+  // moon-free astro-dark spans (10-min steps)
+  let spans=[],cur0=null;
+  if(dusk!=null&&dawn!=null){
+    for(let ms=dusk;ms<=dawn;ms+=6e5){
+      const free=moonInfo(ms,p.lat,p.lon).alt<0;
+      if(free&&cur0==null)cur0=ms;
+      if((!free||ms+6e5>dawn)&&cur0!=null){spans.push([cur0,free?dawn:ms]);cur0=null}
+    }
+  }
+  const longest=spans.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
+  const freeTxt=!longest?"none: moon up all night":(longest[0]===dusk&&longest[1]===dawn)?`all night ${fmt(dusk)}–${fmt(dawn)}`:`${fmt(longest[0])}–${fmt(longest[1])}`;
+  const freeH=longest?((longest[1]-longest[0])/3600e3).toFixed(1):0;
   const anyUp=night.some(h=>h.moon.alt>0);
   mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
   // best window
@@ -381,7 +404,12 @@ function renderTonight(){
   const seeing=M("seeing");
   const nightDate=new Date(night[0].utc+off).toISOString().slice(0,10);
   el.innerHTML=`
-    <div class="mut small">Night of ${nightDate} · astro dark ${fmt(dusk)}–${fmt(dawn)} · Moon ${mtxt}</div>
+    <div class="mut small">Night of ${nightDate} · astro dark ${fmt(dusk)}–${fmt(dawn)}</div>
+    <div class="moonrow">
+      ${moonSVG(mi.illum,mi.waxing)}
+      <div><b>${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"}</b> · ${events.length?events.join(", "):(anyUp?"up all night":"down all night")}<br>
+      <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
+    </div>
     <div class="verdict ${vcls}">${vtxt}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="kpis">
