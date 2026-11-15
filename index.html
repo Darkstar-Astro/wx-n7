@@ -533,7 +533,7 @@ function renderGrid(){
   html="<thead>"+dh+"</tr><tr><th class='lab'>local time</th>";
   nowIdx=H.findIndex(h=>h.utc<=Date.now()&&Date.now()<h.utc+3600e3);
   cols.forEach(o=>{const c=[o.newDay?"dayb":"",bestSet.has(o.i)?"best":"",o.i===nowIdx?"now nowc":""].join(" ");
-    html+=`<th class="${c}" title="${bestSet.has(o.i)?"best clear window":""}">${o.i===nowIdx?"now":o.h.t.slice(11,13)}</th>`});
+    html+=`<th class="${c}" data-i="${o.i}" style="cursor:pointer" title="${bestSet.has(o.i)?"best clear window":""}">${o.i===nowIdx?"now":o.h.t.slice(11,13)}</th>`});
   html+="</tr></thead><tbody>";
   for(const r of ROWS){
     if(r.g){html+=`<tr class="group"><td class="lab">${r.g}</td>${cols.map(o=>`<td class="${o.newDay?"dayb":""}"></td>`).join("")}</tr>`;continue}
@@ -561,8 +561,9 @@ document.getElementById("nights").addEventListener("click",e=>{
   const th=document.querySelector(`#grid td.cell[data-i="${first}"]`); if(th) th.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"});
 });
 document.getElementById("grid").addEventListener("click",e=>{
-  const td=e.target.closest("td.cell"); if(!td) return;
+  const td=e.target.closest("td.cell,th[data-i]"); if(!td) return;
   selIdx=+td.dataset.i; renderGrid(); renderDetail();
+  const dt=document.getElementById("detail"),r=dt.getBoundingClientRect(); if(r.bottom>innerHeight) dt.scrollIntoView({block:"nearest",behavior:"smooth"});
 });
 function renderDetail(){
   const h=H[selIdx]; if(!h) return; const c=h.c;
