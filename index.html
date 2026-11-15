@@ -410,7 +410,7 @@ function renderTonight(){
   const off=(Date.parse(H[0].t+":00Z")-H[0].utc);
   const fmt=ms=>ms==null?"–":new Date(ms+off).toISOString().slice(11,16);
   const n0ms=night[0].utc-3600e3, n1ms=night[night.length-1].utc+3600e3;
-  const dusk=findCross(night[0].utc-8*3600e3,night[0].utc+3*3600e3,-18), dawn=findCross(night[night.length-1].utc-3*3600e3,n1ms,-18);
+  const dusk=findCross(night[0].utc-8*3600e3,night[0].utc+3*3600e3,-18), dawn=findCross(night[night.length-1].utc-3*3600e3,night[night.length-1].utc+14*3600e3,-18);
   // moon events within night
   let mtxt="", prevUp=null, events=[];
   for(let ms=night[0].utc;ms<=night[night.length-1].utc;ms+=6e5){
@@ -441,7 +441,9 @@ function renderTonight(){
   const spanOf=thr=>{let a=null,b=null,pk=0;if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5){const g=glowAt(ms);pk=Math.max(pk,g);if(g>=thr){if(a==null)a=ms;b=ms}}return {a,b,pk}};
   const gS=spanOf(0.3), gN=spanOf(0.7), gX=spanOf(1.5);
   const dirAt=ms=>moonAz(ms,p.lat,p.lon);
-  const glowTxt=gS.a==null?"Moon won't bother you tonight":
+  const upDark=(()=>{let u=[];if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5)if(moonInfo(ms,p.lat,p.lon).alt>0)u.push(ms);return u})();
+  const upTxt=!upDark.length?"":upDark[0]===dusk&&upDark.at(-1)+6e5>dawn?"up all night":upDark[0]===dusk?`up until ${fmt(upDark.at(-1))}`:`up from ${fmt(upDark[0])}`;
+  const glowTxt=gS.a==null?(upDark.length&&mi.illum>=0.3?`Moon ${upTxt} (${Math.round(mi.illum*100)}%): little extra glow at this site`:"Moon won't bother you tonight"):
     gN.a==null?`Slight moon glow ${fmt(gS.a)}–${fmt(gS.b)} (moon low in the ${dirAt(gS.a)}): favour targets away from it`:
     gX.a==null?`Moon glow ${fmt(gN.a)}–${fmt(gN.b)} (moon in the ${dirAt(gN.a)}): choose brighter targets then`:
     `Strong moon glow ${fmt(gX.a)}–${fmt(gX.b)} (moon in the ${dirAt(gX.a)}): moon, planets & doubles then`;
