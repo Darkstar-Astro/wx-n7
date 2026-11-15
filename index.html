@@ -80,7 +80,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 <main>
   <div id="status">Loading…</div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew · M/m moon glow</div>
+  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -99,7 +99,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
       <p><b>Score (0–100).</b> <code>0.65·(100−cloud) + 0.2·transparency + 0.15·seeing (scaled)</code>, capped at 20 when cloud is over 70%. The moon does not count toward the score (it matters for DSOs but not for planets). It shows in the Darkness row.</p>
       <p><b>SQM (estimate).</b> No model forecasts sky brightness. It starts from the location's <i>baseline SQM</i> (clear, moonless, astro-dark zenith), which you set with ✎. Defaults: Aalst 19.0 (measured median, Unihedron SQM). Lesse (Redu) 21.1 and Grandpré 21.5 are derived from lightpollutionmap.app (Bortle 4.4 and 3.6), so replace them with your SQM readings. Replace them with your own meter reading or the World Atlas value from lightpollutionmap.info. The baseline is split into natural sky (21.9) and artificial light. Light pollution is scaled up by humidity above 70%, by AOD above 0.1, and by cloud (×(1+3·cloud), because clouds reflect city light back down). Natural sky is dimmed by cloud. Twilight adds <code>21.9−0.82·(sun alt+18)</code> mag above −18°. The moon adds a term that reaches about 18.1 mag/arcsec² for a full moon at 60° altitude, scaled by the standard phase law and by sin(alt)<sup>0.8</sup>, and boosted by aerosols. Expect ±0.3–0.5 mag. "SQM if clear" shows what the sky would read with zero cloud, which is useful when the clouds are uncertain.</p>
-      <p><b>Moon glow</b> is how many magnitudes the moon brightens the zenith at this site on a clear night: SQM without the moon minus SQM with it. 0.3 mag (about 30% brighter) starts to hurt faint galaxies, and 1 mag (2.5× brighter) is strong. It is site-dependent: in a light-polluted town the moon adds relatively little, while at a dark site the same moon costs much more.</p>
+      <p><b>Moon glow</b> is how many magnitudes the moon brightens the zenith at this site on a clear night: SQM without the moon minus SQM with it. The thresholds are 0.3 mag (slight: aim away from the moon), 0.7 mag (choose brighter targets) and 1.5 mag (strong). The value is for the zenith only. In reality the glow is concentrated on the moon's side of the sky, which is why the page tells you which direction the moon is in. It is site-dependent: in a light-polluted town the moon adds relatively little, while at a dark site the same moon costs much more.</p>
       <p><b>Bortle</b> is converted from SQM with the common approximate table: ≥21.99 → 1, 21.89 → 2, 21.69 → 3, 20.49 → 4, 19.50 → 5, 18.94 → 6, 18.38 → 7, 17.80 → 8, below that 9. Bortle is really a visual scale, so this is a rough equivalent. The hourly row shows how much the moon, twilight and cloud degrade the site that night.</p>
       <p><b>Sun and moon.</b> Computed locally from low-precision ephemerides (about 0.5° accuracy, with a topocentric moon-parallax correction). Darkness row colours run from day to civil, nautical and astronomical twilight to astro-dark. Grey means the moon is up, and a brighter grey means a brighter moon.</p>
       <p><b>Times</b> are local to the selected location.</p>
@@ -199,6 +199,12 @@ function moonEcl(d){
           -0.059*Math.sin(2*M-2*D)-0.057*Math.sin(M-2*D+Ms)+0.053*Math.sin(M+2*D)-0.046*Math.sin(2*D-Ms)+0.041*Math.sin(M-Ms)-0.035*Math.sin(D)-0.031*Math.sin(M+Ms);
   const bet=5.128*Math.sin(F)+0.281*Math.sin(M+F)-0.278*Math.sin(F-M)-0.173*Math.sin(F-2*D);
   return [((lam%360)+360)%360,bet];
+}
+function moonAz(ms,lat,lon){
+  const d=jdays(ms),eps=23.439-4e-7*d,[lm,bm]=moonEcl(d),[ra,dec]=eclToEq(lm,bm,eps);
+  const ha=(gmst(d)+lon-ra)*rad,la=lat*rad,de=dec*rad;
+  const az=Math.atan2(Math.sin(ha),Math.cos(ha)*Math.sin(la)-Math.tan(de)*Math.cos(la))*deg+180;
+  return ["N","NE","E","SE","S","SW","W","NW"][Math.round(((az%360)+360)%360/45)%8];
 }
 function sunAlt(ms,lat,lon){const d=jdays(ms),eps=23.439-4e-7*d;const [ra,dec]=eclToEq(sunLon(d),0,eps);return altOf(ra,dec,d,lat,lon)}
 function moonInfo(ms,lat,lon){
@@ -395,10 +401,12 @@ function renderTonight(){
   const rhN=median(night.map(h=>h.c.rh)), aodN=median(night.map(h=>h.aod));
   const glowAt=ms=>{const hh={sun:-30,moon:moonInfo(ms,p.lat,p.lon)};const a=sqmEst(hh,p.sqm,0,rhN,aodN),b=sqmEst({sun:-30,moon:{alt:-90,illum:0}},p.sqm,0,rhN,aodN);return b-a};
   const spanOf=thr=>{let a=null,b=null,pk=0;if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5){const g=glowAt(ms);pk=Math.max(pk,g);if(g>=thr){if(a==null)a=ms;b=ms}}return {a,b,pk}};
-  const g3=spanOf(0.3), g10=spanOf(1.0);
-  const glowTxt=g3.a==null?"Moon won't bother you tonight":
-    g10.a==null?`Moon brightens the sky ${fmt(g3.a)}–${fmt(g3.b)}: choose brighter targets then`:
-    `Moon glow ${fmt(g3.a)}–${fmt(g3.b)}, strong ${fmt(g10.a)}–${fmt(g10.b)}: moon, planets & doubles then`;
+  const gS=spanOf(0.3), gN=spanOf(0.7), gX=spanOf(1.5);
+  const dirAt=ms=>moonAz(ms,p.lat,p.lon);
+  const glowTxt=gS.a==null?"Moon won't bother you tonight":
+    gN.a==null?`Slight moon glow ${fmt(gS.a)}–${fmt(gS.b)} (moon low in the ${dirAt(gS.a)}): favour targets away from it`:
+    gX.a==null?`Moon glow ${fmt(gN.a)}–${fmt(gN.b)} (moon in the ${dirAt(gN.a)}): choose brighter targets then`:
+    `Strong moon glow ${fmt(gX.a)}–${fmt(gX.b)} (moon in the ${dirAt(gX.a)}): moon, planets & doubles then`;
   const freeH=longest?((longest[1]-longest[0])/3600e3).toFixed(1):0;
   const anyUp=night.some(h=>h.moon.alt>0);
   mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
@@ -465,7 +473,7 @@ const ROWS=[
   {lab:"Fog",f:h=>h.c.fog,good:v=>1-v/100,txt:v=>v>=70?"F":v>=35?"f":""},
   {lab:"Seeing 1–5",f:h=>h.c.seeing,good:v=>(seeCls(v)[1]-1)/4,txt:v=>seeCls(v)[1]},
   {lab:"Transp. 1–5",f:h=>h.c.transp,good:v=>(traCls(v)[1]-1)/4,txt:v=>traCls(v)[1]},
-  {lab:"Moon glow",f:h=>h.glow,good:v=>1-v/1.5,txt:v=>v>=1?"M":v>=0.3?"m":""},
+  {lab:"Moon glow",f:h=>h.glow,good:v=>1-v/1.5,txt:v=>v>=1.5?"M":v>=0.7?"m":v>=0.3?"·":""},
   {lab:"SQM",f:h=>h.c.sqm,good:v=>(v-17)/4.5,txt:v=>v.toFixed(1)},
   {lab:"Temp °C",f:h=>h.c.tt,good:()=>null,txt:v=>Math.round(v)},
   {lab:"Humidity %",f:h=>h.c.rh,good:v=>1-(v-50)/50,txt:v=>Math.round(v)},
