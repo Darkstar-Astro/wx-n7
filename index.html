@@ -28,6 +28,7 @@ button{cursor:pointer} button:active{transform:scale(.97)}
 main{padding:12px;max-width:1400px;margin:0 auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
 .moonrow{display:flex;gap:10px;align-items:center;margin:8px 0 4px;font-size:14px}
+.moonrow .ev{font-weight:650;margin-left:6px;white-space:nowrap}
 .moonrow .free{color:#9fc2ff;font-weight:600}
 .verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
@@ -368,6 +369,10 @@ function renderTonight(){
     const up=moonInfo(ms,p.lat,p.lon).alt>0; if(prevUp!=null&&up!==prevUp) events.push((up?"rises ":"sets ")+fmt(ms)); prevUp=up;
   }
   const mi=moonInfo(night[0].utc,p.lat,p.lon);
+  // moonrise / moonset, noon to noon around tonight (5-min steps)
+  const rs=[]; {const a=night[0].utc-6*3600e3; let pu=moonInfo(a,p.lat,p.lon).alt>0;
+    for(let ms=a+3e5;ms<=a+24*3600e3;ms+=3e5){const up=moonInfo(ms,p.lat,p.lon).alt>0; if(up!==pu) rs.push(`<span class="ev">${up?"↑ rises":"↓ sets"} ${fmt(ms)}</span>`); pu=up}}
+  const rsTxt=rs.length?rs.join(" "):(mi.alt>0?"up all day and night":"below horizon all day");
   // moon-free astro-dark spans (10-min steps)
   let spans=[],cur0=null;
   if(dusk!=null&&dawn!=null){
@@ -407,7 +412,7 @@ function renderTonight(){
     <div class="mut small">Night of ${nightDate} · astro dark ${fmt(dusk)}–${fmt(dawn)}</div>
     <div class="moonrow">
       ${moonSVG(mi.illum,mi.waxing)}
-      <div><b>${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"}</b> · ${events.length?events.join(", "):(anyUp?"up all night":"down all night")}<br>
+      <div><b>${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"}</b> ${rsTxt}<br>
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
