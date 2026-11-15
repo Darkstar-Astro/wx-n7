@@ -369,9 +369,12 @@ function renderTonight(){
     const up=moonInfo(ms,p.lat,p.lon).alt>0; if(prevUp!=null&&up!==prevUp) events.push((up?"rises ":"sets ")+fmt(ms)); prevUp=up;
   }
   const mi=moonInfo(night[0].utc,p.lat,p.lon);
-  // moonrise / moonset, noon to noon around tonight (5-min steps)
-  const rs=[]; {const a=night[0].utc-6*3600e3; let pu=moonInfo(a,p.lat,p.lon).alt>0;
-    for(let ms=a+3e5;ms<=a+24*3600e3;ms+=3e5){const up=moonInfo(ms,p.lat,p.lon).alt>0; if(up!==pu) rs.push(`<span class="ev">${up?"↑ rises":"↓ sets"} ${fmt(ms)}</span>`); pu=up}}
+  // moonrise / moonset relevant to tonight: if up at dusk → previous rise + next set; else next rise + following set
+  const rs=[]; {const t0=night[0].utc, up0=moonInfo(t0,p.lat,p.lon).alt>0, step=3e5;
+    const find=(from,dir,wantUp)=>{let pu=moonInfo(from,p.lat,p.lon).alt>0;for(let k=1;k<=24*12;k++){const ms=from+dir*k*step,u=moonInfo(ms,p.lat,p.lon).alt>0;if(u!==pu&&(dir>0?u===wantUp:pu===wantUp))return ms;pu=u}return null};
+    let r,st;
+    if(up0){r=find(t0,-1,true);st=find(t0,1,false)}else{r=find(t0,1,true);st=r!=null?find(r,1,false):null}
+    if(r!=null)rs.push(`<span class="ev">↑ rises ${fmt(r)}</span>`); if(st!=null)rs.push(`<span class="ev">↓ sets ${fmt(st)}</span>`);}
   const rsTxt=rs.length?rs.join(" "):(mi.alt>0?"up all day and night":"below horizon all day");
   // moon-free astro-dark spans (10-min steps)
   let spans=[],cur0=null;
