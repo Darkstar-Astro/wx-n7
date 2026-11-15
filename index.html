@@ -48,6 +48,9 @@ table.g th.day{color:var(--txt);text-align:left;padding-left:4px;border-left:1px
 table.g td.dayb,table.g th.dayb{border-left:1px solid #3a4558}
 table.g td.cell{cursor:pointer;color:#0a0f1a;font-variant-numeric:tabular-nums}
 table.g td.cell.lt{color:#e9eefb}
+table.g td.cell.l2{background:#2a7f50;color:#eafff1}
+table.g td.cell.l1{background:#94701f;color:#140e03}
+table.g td.cell.l0{background:#141923;color:#5f6879}
 table.g td.sel{outline:2px solid #ffd76a;outline-offset:-2px}
 table.g tr.group td.lab{color:var(--acc);font-weight:600;padding-top:6px}
 #detail table{border-collapse:collapse;width:100%;font-size:12.5px}
@@ -80,7 +83,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 <main>
   <div id="status">Loading…</div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow</div>
+  <div class="legend" style="margin:4px 0 6px;display:block"><b style="color:#4fbf7f">Green</b> good · <b style="color:#c4952e">amber</b> marginal · dark poor · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -465,19 +468,21 @@ function darkColor(h){
   if(s<-6&&h.moon.alt>0){const k=clamp(h.moon.illum*Math.sin(h.moon.alt*rad)*1.4+0.15,0,0.85);c=mix(c,"9aa3b2",k)}
   return "#"+c;
 }
+// lvl: 2 = good, 1 = marginal, 0 = poor, null = neutral
+const L3=(v,g,m,lowerIsBetter=true)=>lowerIsBetter?(v<=g?2:v<=m?1:0):(v>=g?2:v>=m?1:0);
 const ROWS=[
   {lab:"Dark / moon",dark:true},
-  {lab:"Low cloud",f:h=>h.c.ccl,good:v=>1-v/100,txt:v=>Math.round(v)},
-  {lab:"Mid cloud",f:h=>h.c.ccm,good:v=>1-v/100,txt:v=>Math.round(v)},
-  {lab:"High (max)",f:h=>h.c.cch,good:v=>1-v/100,txt:v=>Math.round(v)},
-  {lab:"Fog",f:h=>h.c.fog,good:v=>1-v/100,txt:v=>v>=70?"F":v>=35?"f":""},
-  {lab:"Seeing 1–5",f:h=>h.c.seeing,good:v=>(seeCls(v)[1]-1)/4,txt:v=>seeCls(v)[1]},
-  {lab:"Transp. 1–5",f:h=>h.c.transp,good:v=>(traCls(v)[1]-1)/4,txt:v=>traCls(v)[1]},
-  {lab:"Moon glow",f:h=>h.glow,good:v=>1-v/1.5,txt:v=>v>=1.5?"M":v>=0.7?"m":v>=0.3?"·":""},
-  {lab:"SQM",f:h=>h.c.sqm,good:v=>(v-17)/4.5,txt:v=>v.toFixed(1)},
-  {lab:"Temp °C",f:h=>h.c.tt,good:()=>null,txt:v=>Math.round(v)},
-  {lab:"Humidity %",f:h=>h.c.rh,good:v=>1-(v-50)/50,txt:v=>Math.round(v)},
-  {lab:"Dew",f:h=>h.c.spread,good:v=>v/6,txt:v=>v<1.5?"D":v<3?"d":""},
+  {lab:"Low cloud",f:h=>h.c.ccl,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
+  {lab:"Mid cloud",f:h=>h.c.ccm,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
+  {lab:"High (max)",f:h=>h.c.cch,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
+  {lab:"Fog",f:h=>h.c.fog,lvl:v=>L3(v,34,69),txt:v=>v>=70?"F":v>=35?"f":""},
+  {lab:"Seeing 1–5",f:h=>h.c.seeing,lvl:v=>L3(seeCls(v)[1],4,3,false),txt:v=>seeCls(v)[1]},
+  {lab:"Transp. 1–5",f:h=>h.c.transp,lvl:v=>L3(traCls(v)[1],4,3,false),txt:v=>traCls(v)[1]},
+  {lab:"Moon glow",f:h=>h.glow,lvl:v=>L3(v,0.29,1.49),txt:v=>v>=1.5?"M":v>=0.7?"m":v>=0.3?"·":""},
+  {lab:"SQM",f:h=>h.c.sqm,lvl:v=>{const b=presets[cur].sqm;return L3(v,b-0.3,b-1,false)},txt:v=>v.toFixed(1)},
+  {lab:"Temp °C",f:h=>h.c.tt,lvl:()=>null,txt:v=>Math.round(v)},
+  {lab:"Humidity %",f:h=>h.c.rh,lvl:v=>L3(v,75,90),txt:v=>Math.round(v)},
+  {lab:"Dew",f:h=>h.c.spread,lvl:v=>L3(v,3,1.5,false),txt:v=>v<1.5?"D":v<3?"d":""},
 ];
 function renderGrid(){
   const cols=H.map((h,i)=>({h,i})).filter(o=>!nightOnly||o.h.sun<-6);
@@ -500,9 +505,8 @@ function renderGrid(){
       if(r.dark){const c=darkColor(o.h);html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${c}" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°"></td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
-      const g=r.good(v), c=goodColor(g);
-      if(c&&g>0.62)cls.push("lt"); if(!c)cls.push("lt");
-      html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="${c?"background:"+c:""}">${r.txt(v)}</td>`;
+      const lv=r.lvl(v); cls.push(lv==null?"lt":"l"+lv);
+      html+=`<td class="${cls.join(" ")}" data-i="${o.i}">${r.txt(v)}</td>`;
     }
     html+="</tr>";
   }
