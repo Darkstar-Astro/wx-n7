@@ -31,6 +31,14 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 .moonrow .ev{font-weight:650;margin-left:6px;white-space:nowrap}
 .moonrow .glow{color:#e8d9a8}
 .moonrow .free{color:#9fc2ff;font-weight:600}
+.nights{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px}
+.nchip{flex:1 0 82px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-radius:10px;font-size:12px;text-align:left}
+.nchip b{font-size:13px}.nchip svg{vertical-align:-2px}
+.nchip.go{border-color:#2a7f50}.nchip.maybe{border-color:#94701f}.nchip.no{border-color:#3a1d22}
+.nchip.on{background:#1a2333;outline:2px solid #6ea8ff}
+table.g th.best{background:#2a7f50;color:#eafff1;border-radius:4px}
+table.g th.now{color:#ffd76a;font-weight:700}
+table.g td.nowc,table.g th.nowc{box-shadow:inset 2px 0 0 #ffd76a}
 .verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
@@ -83,9 +91,10 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 </header>
 <main>
   <div id="status">Loading…</div>
+  <div id="nights" class="nights"></div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px;display:block"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow<br>
-    Dark/moon row: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) <span class="sw3" style="background:#7d8597"></span>moon up (☾)</div>
+  <div class="legend" style="margin:4px 0 6px;display:block"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew <br>
+    Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: ☾ up, ☾m noticeable, ☾M strong glow, blank = down</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -171,7 +180,7 @@ presets = presets.map(p=>p.name==="Home (set me)"?{name:"Aalst",lat:50.937,lon:4
 let cur = store.get("cur", 0); if(cur>=presets.length) cur=0;
 let nightOnly = store.get("nightOnly", true);
 let red = store.get("red", false);
-let H = [], loadedModels = [], selIdx = null;
+let H = [], loadedModels = [], selIdx = null, nightSel = 0, bestSet = new Set(), nowIdx = -1;
 
 // ---------- math helpers ----------
 const rad=Math.PI/180, deg=180/Math.PI;
@@ -344,12 +353,12 @@ async function load(){
     h.c.score=score(h.c);
     h.c.sqm=sqmEst(h,p.sqm,h.c.cc,h.c.rh,h.aod);
     h.sqmClear=sqmEst(h,p.sqm,0,h.c.rh,h.aod);
-    {const nm=sqmEst({...h,moon:{alt:-90,illum:0}},p.sqm,0,h.c.rh,h.aod); h.glow=(nn(nm)&&nn(h.sqmClear)&&h.sun<-12)?Math.max(0,nm-h.sqmClear):null;}
+    {const nm=sqmEst({...h,moon:{alt:-90,illum:0}},p.sqm,0,h.c.rh,h.aod); h.glow=(nn(nm)&&nn(h.sqmClear)&&h.sun<-6)?Math.max(0,nm-h.sqmClear):null;}
     H.push(h);
   });
   const ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
   setStatus(`Updated ${ts} · ${ok.length}/${MODELS.length} models · CAMS aerosols ${aq?"✓":"✗"}`);
-  renderTonight(); renderGrid();
+  renderTonight(); renderNights(); renderGrid();
 }
 function setStatus(h){document.getElementById("status").innerHTML=h}
 
@@ -364,12 +373,35 @@ function moonSVG(k,waxing,size=44){
 }
 // ---------- tonight summary ----------
 function hhmm(t){return t.slice(11,16)}
+function nightBlocks(){
+  const out=[];let i=0;
+  while(i<H.length){if(H[i].sun<-12){let e=i;while(e+1<H.length&&H[e+1].sun<-12)e++;out.push({s:i,e});i=e+1}else i++}
+  return out;
+}
+function bestRun(night){
+  let best=null,run=null;
+  night.forEach((h,i)=>{if(nn(h.c.score)&&h.c.score>=60){if(!run)run={a:i,b:i};else run.b=i}else{if(run&&(!best||run.b-run.a>best.b-best.a))best=run;run=null}});
+  if(run&&(!best||run.b-run.a>best.b-best.a))best=run;
+  return best;
+}
+const endHH=t=>String((+t.slice(11,13)+1)%24).padStart(2,"0")+":00";
+function renderNights(){
+  const el=document.getElementById("nights"),p=presets[cur],bl=nightBlocks();
+  if(!bl.length){el.innerHTML="";return}
+  el.innerHTML=bl.map((b,k)=>{
+    const night=H.slice(b.s,b.e+1),best=bestRun(night),maxS=Math.max(...night.map(h=>h.c.score??0));
+    const v=best?["go","✅",`${night[best.a].t.slice(11,13)}–${endHH(night[best.b].t).slice(0,2)}h`]:maxS>=40?["maybe","⚠️","gaps"]:["no","❌","cloudy"];
+    const m=moonInfo(night[0].utc,p.lat,p.lon);
+    const d=new Date(night[0].t.slice(0,10)+"T12:00Z").toLocaleDateString([], {weekday:"short",day:"numeric",timeZone:"UTC"});
+    return `<button class="nchip ${v[0]}${k===nightSel?" on":""}" data-n="${k}"><b>${d}</b><span>${v[1]} ${v[2]}</span><span class="mut">${moonSVG(m.illum,m.waxing,14)} ${Math.round(m.illum*100)}%</span></button>`;
+  }).join("");
+}
 function renderTonight(){
   const p=presets[cur], el=document.getElementById("tonight");
-  // first contiguous block with sun < -12
-  let s=H.findIndex(h=>h.sun<-12);
-  if(s<0){el.innerHTML='<div class="verdict no">No astronomical night in range</div>';return}
-  let e=s; while(e+1<H.length&&H[e+1].sun<-12) e++;
+  const bl=nightBlocks(); bestSet=new Set();
+  if(!bl.length){el.innerHTML='<div class="verdict no">No astronomical night in range</div>';return}
+  if(nightSel>=bl.length) nightSel=0;
+  const {s,e}=bl[nightSel];
   const night=H.slice(s,e+1);
   const dark=night.filter(h=>h.sun<-18).length?night.filter(h=>h.sun<-18):night;
   // dusk/dawn at 10-min resolution
@@ -377,7 +409,7 @@ function renderTonight(){
   const off=(Date.parse(H[0].t+":00Z")-H[0].utc);
   const fmt=ms=>ms==null?"–":new Date(ms+off).toISOString().slice(11,16);
   const n0ms=night[0].utc-3600e3, n1ms=night[night.length-1].utc+3600e3;
-  const dusk=findCross(n0ms,night[0].utc+3*3600e3,-18), dawn=findCross(night[night.length-1].utc-3*3600e3,n1ms,-18);
+  const dusk=findCross(night[0].utc-8*3600e3,night[0].utc+3*3600e3,-18), dawn=findCross(night[night.length-1].utc-3*3600e3,n1ms,-18);
   // moon events within night
   let mtxt="", prevUp=null, events=[];
   for(let ms=night[0].utc;ms<=night[night.length-1].utc;ms+=6e5){
@@ -385,7 +417,7 @@ function renderTonight(){
   }
   const mi=moonInfo(night[0].utc,p.lat,p.lon);
   // moonrise / moonset relevant to tonight: if up at dusk → previous rise + next set; else next rise + following set
-  const rs=[]; {const t0=night[0].utc, up0=moonInfo(t0,p.lat,p.lon).alt>0, step=3e5;
+  const rs=[]; {const t0=dusk??night[0].utc, up0=moonInfo(t0,p.lat,p.lon).alt>0, step=3e5;
     const find=(from,dir,wantUp)=>{let pu=moonInfo(from,p.lat,p.lon).alt>0;for(let k=1;k<=24*12;k++){const ms=from+dir*k*step,u=moonInfo(ms,p.lat,p.lon).alt>0;if(u!==pu&&(dir>0?u===wantUp:pu===wantUp))return ms;pu=u}return null};
     let r,st;
     if(up0){r=find(t0,-1,true);st=find(t0,1,false)}else{r=find(t0,1,true);st=r!=null?find(r,1,false):null}
@@ -416,9 +448,8 @@ function renderTonight(){
   const anyUp=night.some(h=>h.moon.alt>0);
   mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
   // best window
-  let best=null,run=null;
-  night.forEach((h,i)=>{if(nn(h.c.score)&&h.c.score>=60){if(!run)run={a:i,b:i};else run.b=i}else{if(run&&(!best||run.b-run.a>best.b-best.a))best=run;run=null}});
-  if(run&&(!best||run.b-run.a>best.b-best.a))best=run;
+  const best=bestRun(night);
+  if(best) for(let k=best.a;k<=best.b;k++) bestSet.add(s+k);
   const maxS=Math.max(...night.map(h=>h.c.score??0));
   let vcls,vtxt;
   if(best){vcls="go";vtxt=`Go: ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t.replace(/T(\d\d)/,(m,x)=>"T"+String((+x+1)%24).padStart(2,"0")))} looks clear`}
@@ -467,20 +498,19 @@ function goodColor(g){ // g: 0 bad .. 1 good
 function darkColor(h){
   const s=h.sun;
   let c=s>0?"f2c94c":s>-6?"b07a35":s>-12?"3d4f7d":s>-18?"1b2440":"000000";
-  if(s<-6&&h.moon.alt>0){const k=clamp(h.moon.illum*Math.sin(h.moon.alt*rad)*1.4+0.15,0,0.85);c=mix(c,"9aa3b2",k)}
   return "#"+c;
 }
 // lvl: 2 = good, 1 = marginal, 0 = poor, null = neutral
 const L3=(v,g,m,lowerIsBetter=true)=>lowerIsBetter?(v<=g?2:v<=m?1:0):(v>=g?2:v>=m?1:0);
 const ROWS=[
-  {lab:"Dark / moon",dark:true},
+  {lab:"Darkness",dark:true},
+  {lab:"Moon",f:h=>h.moon.alt>0?(h.glow??0):-1,lvl:v=>v<0?null:L3(v,0.29,1.49),txt:v=>v<0?"":v>=1.5?"☾M":v>=0.7?"☾m":"☾"},
   {lab:"Low cloud",f:h=>h.c.ccl,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"Mid cloud",f:h=>h.c.ccm,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"High (max)",f:h=>h.c.cch,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"Fog",f:h=>h.c.fog,lvl:v=>L3(v,34,69),txt:v=>v>=70?"F":v>=35?"f":""},
   {lab:"Seeing 1–5",f:h=>h.c.seeing,lvl:v=>L3(seeCls(v)[1],4,3,false),txt:v=>seeCls(v)[1]},
   {lab:"Transp. 1–5",f:h=>h.c.transp,lvl:v=>L3(traCls(v)[1],4,3,false),txt:v=>traCls(v)[1]},
-  {lab:"Moon glow",f:h=>h.glow,lvl:v=>L3(v,0.29,1.49),txt:v=>v>=1.5?"M":v>=0.7?"m":v>=0.3?"·":""},
   {lab:"SQM",f:h=>h.c.sqm,lvl:v=>{const b=presets[cur].sqm;return L3(v,b-0.3,b-1,false)},txt:v=>v.toFixed(1)},
   {lab:"Temp °C",f:h=>h.c.tt,lvl:()=>null,txt:v=>Math.round(v)},
   {lab:"Humidity %",f:h=>h.c.rh,lvl:v=>L3(v,75,90),txt:v=>Math.round(v)},
@@ -496,15 +526,17 @@ function renderGrid(){
   cols.forEach(o=>{const dt=new Date(o.h.t.slice(0,10)+"T12:00Z");
     dh+=`<th class="${o.newDay?"day dayb":""}">${o.newDay?dt.toLocaleDateString([], {weekday:"short",day:"numeric",timeZone:"UTC"}):""}</th>`});
   html="<thead>"+dh+"</tr><tr><th class='lab'>local time</th>";
-  cols.forEach(o=>html+=`<th class="${o.newDay?"dayb":""}">${o.h.t.slice(11,13)}</th>`);
+  nowIdx=H.findIndex(h=>h.utc<=Date.now()&&Date.now()<h.utc+3600e3);
+  cols.forEach(o=>{const c=[o.newDay?"dayb":"",bestSet.has(o.i)?"best":"",o.i===nowIdx?"now nowc":""].join(" ");
+    html+=`<th class="${c}" title="${bestSet.has(o.i)?"best clear window":""}">${o.i===nowIdx?"now":o.h.t.slice(11,13)}</th>`});
   html+="</tr></thead><tbody>";
   for(const r of ROWS){
     if(r.g){html+=`<tr class="group"><td class="lab">${r.g}</td>${cols.map(o=>`<td class="${o.newDay?"dayb":""}"></td>`).join("")}</tr>`;continue}
     if(r.model&&!loadedModels.some(m=>m.key===r.model)) continue;
     html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
     for(const o of cols){
-      const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel");
-      if(r.dark){const c=darkColor(o.h),sym=o.h.sun<-6&&o.h.moon.alt>0?"☾":o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
+      const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel"); if(o.i===nowIdx)cls.push("nowc");
+      if(r.dark){const c=darkColor(o.h),sym=o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
       const lv=r.lvl(v); cls.push(lv==null?"lt":"l"+lv);
@@ -516,6 +548,12 @@ function renderGrid(){
   const g=document.getElementById("grid"); g.innerHTML=html;
   document.getElementById("btnNight").style.borderColor=nightOnly?"#6ea8ff":"";
 }
+document.getElementById("nights").addEventListener("click",e=>{
+  const b=e.target.closest(".nchip"); if(!b) return;
+  nightSel=+b.dataset.n; renderTonight(); renderNights(); renderGrid();
+  const first=[...bestSet][0]??nightBlocks()[nightSel].s;
+  const th=document.querySelector(`#grid td.cell[data-i="${first}"]`); if(th) th.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"});
+});
 document.getElementById("grid").addEventListener("click",e=>{
   const td=e.target.closest("td.cell"); if(!td) return;
   selIdx=+td.dataset.i; renderGrid(); renderDetail();
@@ -533,7 +571,7 @@ function fillPresets(){
 }
 document.getElementById("preset").onchange=e=>{
   if(e.target.value==="new"){openDlg(null);e.target.value=cur;return}
-  cur=+e.target.value; store.set("cur",cur); load();
+  cur=+e.target.value; nightSel=0; store.set("cur",cur); load();
 };
 let editing=null;
 function openDlg(i){
