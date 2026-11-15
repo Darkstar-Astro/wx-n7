@@ -458,7 +458,7 @@ function renderTonight(){
   const dirAt=ms=>moonAz(ms,p.lat,p.lon);
   const upDark=(()=>{let u=[];if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5)if(moonInfo(ms,p.lat,p.lon).alt>0)u.push(ms);return u})();
   const upTxt=!upDark.length?"":upDark[0]===dusk&&upDark.at(-1)+6e5>dawn?"up all night":upDark[0]===dusk?`up until ${fmt(upDark.at(-1))}`:`up from ${fmt(upDark[0])}`;
-  const glowTxt=gS.a==null?(upDark.length&&mi.illum>=0.3?`Moon ${upTxt} (${Math.round(mi.illum*100)}%): little extra glow at this site`:"Moon won't bother you tonight"):
+  const glowTxt=gS.a==null?"":
     gN.a==null?`Slight moon glow ${fmt(gS.a)}–${fmt(gS.b)} (moon low in the ${dirAt(gS.a)}): favour targets away from it`:
     gX.a==null?`Moon glow ${fmt(gN.a)}–${fmt(gN.b)} (moon in the ${dirAt(gN.a)}): choose brighter targets then`:
     `Strong moon glow ${fmt(gX.a)}–${fmt(gX.b)} (moon in the ${dirAt(gX.a)}): moon, planets & doubles then`;
@@ -490,7 +490,7 @@ function renderTonight(){
     <div class="moonrow">
       ${moonSVG(mi.illum,mi.waxing)}
       <div><b>${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"}</b> ${rsTxt}<br>
-      <span class="glow">🌕 ${glowTxt}</span><br>
+      ${glowTxt?`<span class="glow">🌕 ${glowTxt}</span><br>`:""}
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
