@@ -43,8 +43,8 @@ table.g td.nowc,table.g th.nowc{box-shadow:inset 2px 0 0 #ffd76a}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
 .kpi{background:#0b0e14;border:1px solid var(--line);border-radius:10px;padding:8px}
-.kpi b{display:block;font-size:16px}
-.kpi span{color:var(--mut);font-size:12px}
+.kpi b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi span{color:var(--mut);font-size:11.5px;line-height:1.3;display:block}
 .mut{color:var(--mut)} .small{font-size:12px}
 .gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 table.g{border-collapse:separate;border-spacing:0;font-size:10.5px}
@@ -93,7 +93,8 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
   <div id="status">Loading…</div>
   <div id="nights" class="nights"></div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px;display:block"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew <br>
+  <button id="btnLegend" class="small" style="margin:4px 0 6px;padding:3px 9px">ⓘ Legend</button>
+  <div id="legend" class="legend" style="margin:0 0 6px;display:none"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew <br>
     Darkness: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) · Moon: ☾ up, ☾m noticeable, ☾M strong glow, blank = down</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
@@ -299,8 +300,8 @@ function fogRisk(v){
 }
 const fogTxt=v=>!nn(v)?"–":v>=70?"high":v>=35?"moderate":"low";
 // Seeing → 1..5 class (5 best) with plain-language label
-const SEE=[[1.2,5,"Excellent","planets: push magnification"],[1.7,4,"Good","planets: go"],[2.3,3,"Average","planets OK ~200×"],[3.0,2,"Poor","deep-sky only"],[99,1,"Bad","deep-sky, low power"]];
-const TRA=[[80,5,"Excellent","faint galaxies & nebulae"],[65,4,"Good","DSOs: go"],[50,3,"Average","bright DSOs"],[35,2,"Poor","moon, planets, doubles"],[-1,1,"Bad","bright targets only"]];
+const SEE=[[1.2,5,"Excellent","planets ++"],[1.7,4,"Good","planets go"],[2.3,3,"Average","planets ~200×"],[3.0,2,"Poor","DSO only"],[99,1,"Bad","low power"]];
+const TRA=[[80,5,"Excellent","faint DSOs"],[65,4,"Good","DSOs go"],[50,3,"Average","bright DSOs"],[35,2,"Poor","moon/planets"],[-1,1,"Bad","bright only"]];
 const traCls=t=>nn(t)?TRA.find(r=>t>=r[0]):null;
 const seeCls=a=>nn(a)?SEE.find(r=>a<r[0]):null;
 const seeingGood=a=>nn(a)?clamp((3.5-a)/2.5,0,1):null; // 1.0"→1, 3.5"→0
@@ -477,13 +478,14 @@ function renderTonight(){
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
+    <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
     <div class="kpis">
-      <div class="kpi"><b>${n0(M("ccl"))} / ${n0(M("ccm"))} / ${n0(M("cch"))}%</b><span>low / mid / high cloud ${winTxt}</span></div>
-      <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog risk</span></div>
-      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>seeing ${winTxt} · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
-      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>transparency ${winTxt} · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
-      <div class="kpi"><b>${(()=>{const v=night.map(h=>h.c.sqm).filter(nn);return v.length?Math.max(...v).toFixed(1)+" · B"+bortle(Math.max(...v)):"–"})()}</b><span>best SQM · Bortle</span></div>
-      <div class="kpi"><b>${dewTxt} · ${n0(M("rh"))}%</b><span>dew risk · humidity<br>coldest tonight ${isFinite(minT)?minT.toFixed(0):"–"} °C</span></div>
+      <div class="kpi"><b>${n0(M("ccl"))}/${n0(M("ccm"))}/${n0(M("cch"))}%</b><span>cloud L/M/H</span></div>
+      <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog</span></div>
+      <div class="kpi"><b>${dewTxt}</b><span>dew · ${n0(M("rh"))}% · min ${isFinite(minT)?minT.toFixed(0):"–"}°C</span></div>
+      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>≈ seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
+      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>≈ transp. · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
+      <div class="kpi"><b>${(()=>{const v=night.map(h=>h.c.sqm).filter(nn);return v.length?Math.max(...v).toFixed(1)+" · B"+bortle(Math.max(...v)):"–"})()}</b><span>≈ best SQM</span></div>
     </div>`;
 }
 
@@ -509,9 +511,9 @@ const ROWS=[
   {lab:"Mid cloud",f:h=>h.c.ccm,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"High (max)",f:h=>h.c.cch,lvl:v=>L3(v,20,50),txt:v=>Math.round(v)},
   {lab:"Fog",f:h=>h.c.fog,lvl:v=>L3(v,34,69),txt:v=>v>=70?"F":v>=35?"f":""},
-  {lab:"Seeing 1–5",f:h=>h.c.seeing,lvl:v=>L3(seeCls(v)[1],4,3,false),txt:v=>seeCls(v)[1]},
-  {lab:"Transp. 1–5",f:h=>h.c.transp,lvl:v=>L3(traCls(v)[1],4,3,false),txt:v=>traCls(v)[1]},
-  {lab:"SQM",f:h=>h.c.sqm,lvl:v=>{const b=presets[cur].sqm;return L3(v,b-0.3,b-1,false)},txt:v=>v.toFixed(1)},
+  {lab:"Seeing ≈",f:h=>h.c.seeing,lvl:v=>L3(seeCls(v)[1],4,3,false),txt:v=>seeCls(v)[1]},
+  {lab:"Transp. ≈",f:h=>h.c.transp,lvl:v=>L3(traCls(v)[1],4,3,false),txt:v=>traCls(v)[1]},
+  {lab:"SQM ≈",f:h=>h.c.sqm,lvl:v=>{const b=presets[cur].sqm;return L3(v,b-0.3,b-1,false)},txt:v=>v.toFixed(1)},
   {lab:"Temp °C",f:h=>h.c.tt,lvl:()=>null,txt:v=>Math.round(v)},
   {lab:"Humidity %",f:h=>h.c.rh,lvl:v=>L3(v,75,90),txt:v=>Math.round(v)},
   {lab:"Dew",f:h=>h.c.spread,lvl:v=>L3(v,3,1.5,false),txt:v=>v<1.5?"D":v<3?"d":""},
@@ -606,6 +608,8 @@ document.getElementById("btnLocate").onclick=()=>{
 document.getElementById("btnNight").onclick=()=>{nightOnly=!nightOnly;store.set("nightOnly",nightOnly);renderGrid()};
 document.getElementById("btnRed").onclick=()=>{red=!red;store.set("red",red);document.body.classList.toggle("red",red)};
 document.getElementById("btnReload").onclick=load;
+{const lg=document.getElementById("legend");const show=v=>{lg.style.display=v?"block":"none";store.set("legend",v)};show(store.get("legend",false));
+ document.getElementById("btnLegend").onclick=()=>show(lg.style.display==="none");}
 document.body.classList.toggle("red",red);
 fillPresets(); load();
 </script>
