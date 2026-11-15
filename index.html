@@ -84,7 +84,8 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 <main>
   <div id="status">Loading…</div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px;display:block"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow</div>
+  <div class="legend" style="margin:4px 0 6px;display:block"><span class="sw3" style="background:#2a7f50"></span>good <span class="sw3" style="background:#94701f"></span>marginal <span class="sw3" style="background:#3a1d22;border-color:#7a3a44"></span>poor · seeing & transp. 5 = best · F/f fog · D/d dew · M/m/· moon glow<br>
+    Dark/moon row: <span class="sw3" style="background:#000;border-color:#3a4558"></span>dark <span class="sw3" style="background:#1b2440"></span><span class="sw3" style="background:#3d4f7d;margin-left:0"></span>twilight (tw) <span class="sw3" style="background:#7d8597"></span>moon up (☾)</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -503,7 +504,7 @@ function renderGrid(){
     html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
     for(const o of cols){
       const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel");
-      if(r.dark){const c=darkColor(o.h);html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${c}" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°"></td>`;continue}
+      if(r.dark){const c=darkColor(o.h),sym=o.h.sun<-6&&o.h.moon.alt>0?"☾":o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
       const lv=r.lvl(v); cls.push(lv==null?"lt":"l"+lv);
