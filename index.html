@@ -80,7 +80,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 <main>
   <div id="status">Loading…</div>
   <div class="card" id="tonight"></div>
-  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew</div>
+  <div class="legend" style="margin:4px 0 6px">Blue = good · seeing & transp. 5 = best · F/f fog · D/d dew · M/m moon glow</div>
   <div class="gridwrap"><table class="g" id="grid"></table></div>
   <div class="card small" id="detail" style="margin-top:8px"><span class="mut small">Tap an hour for its values.</span></div>
   <div class="card">
@@ -395,8 +395,9 @@ function renderTonight(){
   const glowAt=ms=>{const hh={sun:-30,moon:moonInfo(ms,p.lat,p.lon)};const a=sqmEst(hh,p.sqm,0,rhN,aodN),b=sqmEst({sun:-30,moon:{alt:-90,illum:0}},p.sqm,0,rhN,aodN);return b-a};
   const spanOf=thr=>{let a=null,b=null,pk=0;if(dusk!=null&&dawn!=null)for(let ms=dusk;ms<=dawn;ms+=6e5){const g=glowAt(ms);pk=Math.max(pk,g);if(g>=thr){if(a==null)a=ms;b=ms}}return {a,b,pk}};
   const g3=spanOf(0.3), g10=spanOf(1.0);
-  const glowTxt=g3.a==null?`Moon glow: negligible tonight (max ${g3.pk.toFixed(1)} mag)`:
-    `Moon glow ≥0.3 mag: ${fmt(g3.a)}–${fmt(g3.b)}`+(g10.a!=null?` · strong (≥1 mag) ${fmt(g10.a)}–${fmt(g10.b)}`:"")+` <span class="mut">(peak ${g3.pk.toFixed(1)} mag)</span>`;
+  const glowTxt=g3.a==null?"Moon won't bother you tonight":
+    g10.a==null?`Moon brightens the sky ${fmt(g3.a)}–${fmt(g3.b)}: choose brighter targets then`:
+    `Moon glow ${fmt(g3.a)}–${fmt(g3.b)}, strong ${fmt(g10.a)}–${fmt(g10.b)}: moon, planets & doubles then`;
   const freeH=longest?((longest[1]-longest[0])/3600e3).toFixed(1):0;
   const anyUp=night.some(h=>h.moon.alt>0);
   mtxt=`${Math.round(mi.illum*100)}% ${mi.waxing?"waxing":"waning"} · `+(events.length?events.join(", "):(anyUp?"up all night":"below horizon all night"));
@@ -463,7 +464,7 @@ const ROWS=[
   {lab:"Fog",f:h=>h.c.fog,good:v=>1-v/100,txt:v=>v>=70?"F":v>=35?"f":""},
   {lab:"Seeing 1–5",f:h=>h.c.seeing,good:v=>(seeCls(v)[1]-1)/4,txt:v=>seeCls(v)[1]},
   {lab:"Transp. 1–5",f:h=>h.c.transp,good:v=>(traCls(v)[1]-1)/4,txt:v=>traCls(v)[1]},
-  {lab:"Moon glow mag",f:h=>h.glow,good:v=>1-v/1.5,txt:v=>v>=0.1?v.toFixed(1):""},
+  {lab:"Moon glow",f:h=>h.glow,good:v=>1-v/1.5,txt:v=>v>=1?"M":v>=0.3?"m":""},
   {lab:"SQM",f:h=>h.c.sqm,good:v=>(v-17)/4.5,txt:v=>v.toFixed(1)},
   {lab:"Temp °C",f:h=>h.c.tt,good:()=>null,txt:v=>Math.round(v)},
   {lab:"Humidity %",f:h=>h.c.rh,good:v=>1-(v-50)/50,txt:v=>Math.round(v)},
