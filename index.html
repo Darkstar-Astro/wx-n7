@@ -540,7 +540,7 @@ function renderGrid(){
     html+=`<tr><td class="lab">${r.lab.replace(/^  /,"&nbsp;&nbsp;↳ ")}</td>`;
     for(const o of cols){
       const cls=["cell"]; if(o.newDay)cls.push("dayb"); if(o.i===selIdx)cls.push("sel"); if(o.i===nowIdx)cls.push("nowc");
-      if(r.moon){const up=o.h.moon.alt>0;html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="${up?"background:#2b2618":""}" title="moon ${o.h.moon.alt.toFixed(0)}°, ${Math.round(o.h.moon.illum*100)}%">${up?moonSVG(o.h.moon.illum,o.h.moon.waxing,15):""}</td>`;continue}
+      if(r.moon){const up=o.h.moon.alt>0;html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="background:${darkColor(o.h)}" title="moon ${o.h.moon.alt.toFixed(0)}°, ${Math.round(o.h.moon.illum*100)}%">${up?moonSVG(o.h.moon.illum,o.h.moon.waxing,15):""}</td>`;continue}
       if(r.dark){const c=darkColor(o.h),sym=o.h.sun>=-18&&o.h.sun<0?"tw":o.h.sun>=0?"☀":"";html+=`<td class="${cls.join(" ")} lt" data-i="${o.i}" style="background:${c};color:#c9d3e6" title="sun ${o.h.sun.toFixed(0)}°, moon ${o.h.moon.alt.toFixed(0)}°">${sym}</td>`;continue}
       const v=r.f(o.h);
       if(!nn(v)){html+=`<td class="${cls.join(" ")}" data-i="${o.i}" style="color:#4a5466">·</td>`;continue}
