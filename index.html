@@ -116,7 +116,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       <p><b>Fog.</b> Uses the model visibility where a model gives it (under 1 km is high risk, under 2 km elevated). Otherwise, a temperature − dew point spread of 0.5 °C or less with wind under 3 m/s counts as high risk. The page shows the median across models.</p>
       <p><b>Transparency scale.</b> 5 Excellent (≥80), 4 Good (65–79), 3 Average (50–64), 2 Poor (35–49), 1 Bad (&lt;35), from the 0–100 formula above.</p>
       <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
-      <p><b>Score (0–100).</b> <code>0.65·(100−cloud) + 0.2·transparency + 0.15·seeing (scaled)</code>, capped at 20 when cloud is over 70%. The moon does not count toward the score (it matters for DSOs but not for planets). It shows in the Darkness row.</p>
+      <p><b>Score (0–100).</b> Cloud here is the <i>effective</i> cloud: max(low, mid, ½·high), because thin cirrus dims the sky but doesn't block it. <code>0.65·(100−cloud) + 0.2·transparency + 0.15·seeing (scaled)</code>, capped at 20 when cloud is over 70%. The moon does not count toward the score (it matters for DSOs but not for planets). It shows in the Darkness row.</p>
       <p><b>SQM (estimate).</b> No model forecasts sky brightness. It starts from the location's <i>baseline SQM</i> (clear, moonless, astro-dark zenith), which you set with ✎. Defaults: Aalst 19.0 (measured median, Unihedron SQM). Lesse (Redu) 21.1 and Grandpré 21.5 are derived from lightpollutionmap.app (Bortle 4.4 and 3.6), so replace them with your SQM readings. Replace them with your own meter reading or the World Atlas value from lightpollutionmap.info. The baseline is split into natural sky (21.9) and artificial light. Light pollution is scaled up by humidity above 70%, by AOD above 0.1, and by cloud (×(1+3·cloud), because clouds reflect city light back down). Natural sky is dimmed by cloud. Twilight adds <code>21.9−0.82·(sun alt+18)</code> mag above −18°. The moon adds a term that reaches about 18.1 mag/arcsec² for a full moon at 60° altitude, scaled by the standard phase law and by sin(alt)<sup>0.8</sup>, and boosted by aerosols. Expect ±0.3–0.5 mag. "SQM if clear" shows what the sky would read with zero cloud, which is useful when the clouds are uncertain.</p>
             <p><b>Bortle</b> is converted from SQM with the common approximate table: ≥21.99 → 1, 21.89 → 2, 21.69 → 3, 20.49 → 4, 19.50 → 5, 18.94 → 6, 18.38 → 7, 17.80 → 8, below that 9. Bortle is really a visual scale, so this is a rough equivalent. The hourly row shows how much the moon, twilight and cloud degrade the site that night.</p>
       <p><b>Sun and moon.</b> Computed locally from low-precision ephemerides (about 0.5° accuracy, with a topocentric moon-parallax correction). Darkness row colours run from day to civil, nautical and astronomical twilight to astro-dark. Grey means the moon is up, and a brighter grey means a brighter moon.</p>
@@ -315,9 +315,10 @@ const traCls=t=>nn(t)?TRA.find(r=>t>=r[0]):null;
 const seeCls=a=>nn(a)?SEE.find(r=>a<r[0]):null;
 const seeingGood=a=>nn(a)?clamp((3.5-a)/2.5,0,1):null; // 1.0"→1, 3.5"→0
 function score(c){
-  if(!nn(c.cc)) return null;
+  const cl=nn(c.cceff)?c.cceff:c.cc;
+  if(!nn(cl)) return null;
   const sg=nn(c.seeing)?seeingGood(c.seeing)*100:50, tr=nn(c.transp)?c.transp:50;
-  let s=0.65*(100-c.cc)+0.2*tr+0.15*sg; if(c.cc>70) s=Math.min(s,20);
+  let s=0.65*(100-cl)+0.2*tr+0.15*sg; if(cl>70) s=Math.min(s,20);
   return clamp(s,0,100);
 }
 
@@ -364,10 +365,13 @@ async function load(){
     h.c={cc:med(v=>v.cc),ccl:med(v=>v.ccl),ccm:med(v=>v.ccm),cch:med(v=>v.cch),rh:med(v=>v.rh),spread:med(v=>v.spread),
       tt:med(v=>v.tt),fog:med(v=>v.fog),ws:med(v=>v.ws),wg:med(v=>v.wg),jet:med(v=>v.jet),seeing:med(v=>v.seeing),transp:med(v=>v.transp),pr:med(v=>v.pr),
       ccsd:sd(all.map(v=>v.cc))};
+    // effective cloud for the verdict: low/mid count fully, (thin) high cloud counts half
+    h.c.cchMed=h.c.cch;
+    h.c.cceff=(nn(h.c.ccl)||nn(h.c.ccm))?Math.max(h.c.ccl??0,h.c.ccm??0,0.5*(h.c.cchMed??0)):h.c.cc;
     {const hc=all.map(v=>v.cch).filter(nn); h.c.cch=hc.length?Math.max(...hc):null;
      h.c.transp=median(all.map(v=>transparency({...v,cch:nn(h.c.cch)?h.c.cch:v.cch},h.aod)));}
     h.c.score=score(h.c);
-    h.c.sqm=sqmEst(h,p.sqm,h.c.cc,h.c.rh,h.aod);
+    h.c.sqm=sqmEst(h,p.sqm,h.c.cceff??h.c.cc,h.c.rh,h.aod);
     h.sqmClear=sqmEst(h,p.sqm,0,h.c.rh,h.aod);
     H.push(h);
   });
@@ -546,7 +550,8 @@ function renderTonight(){
   const maxS=Math.max(...night.map(h=>h.c.score??0));
   let vcls,vtxt;
   if(best){vcls="go";vtxt=`Go: ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t.replace(/T(\d\d)/,(m,x)=>"T"+String((+x+1)%24).padStart(2,"0")))} looks clear`}
-  else if(maxS>=40){vcls="maybe";vtxt="Marginal: gaps possible, watch the radar"}
+  else if(maxS>=40){vcls="maybe";const lm=median(night.map(h=>Math.max(h.c.ccl??0,h.c.ccm??0)));
+    vtxt=nn(lm)&&lm<30?"Marginal: mainly high/thin cloud, bright targets OK":"Marginal: gaps possible, watch the radar"}
   else {vcls="no";vtxt="No-go: clouded out"}
   if(best&&night.slice(best.a,best.b+1).some(h=>nn(h.c.cch)&&h.c.cch>=30)) vtxt+=" · thin cirrus possible";
   // summarise the best clear window if there is one, else all dark hours
