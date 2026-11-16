@@ -66,7 +66,9 @@ table.g td.cell.l2{background:#2a7f50;color:#eafff1}
 table.g td.cell.l1{background:#94701f;color:#140e03}
 table.g td.cell.l0{background:#3a1d22;color:#b0737a}
 table.g .mdir{font-size:9px;line-height:1;color:#e8dcb8;margin-top:1px}
-table.g td.sel{outline:2px solid #ffd76a;outline-offset:-2px}
+table.g td.sel{box-shadow:inset 2px 0 0 #ffd76a,inset -2px 0 0 #ffd76a}
+table.g th.sel{box-shadow:inset 2px 0 0 #ffd76a,inset -2px 0 0 #ffd76a,inset 0 2px 0 #ffd76a}
+table.g tbody tr:last-child td.sel{box-shadow:inset 2px 0 0 #ffd76a,inset -2px 0 0 #ffd76a,inset 0 -2px 0 #ffd76a}
 table.g tr.group td.lab{color:var(--acc);font-weight:600;padding-top:6px}
 #detail table{border-collapse:collapse;width:100%;font-size:12.5px}
 #detail th,#detail td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
@@ -147,7 +149,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261116183456";
+const APP_VERSION="20261116195555";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -647,7 +649,7 @@ function renderGrid(){
     dh+=`<th class="${o.newDay?"day dayb":""}">${o.newDay?dt.toLocaleDateString([], {weekday:"short",day:"numeric",timeZone:"UTC"}):""}</th>`});
   html="<thead>"+dh+"</tr><tr><th class='lab'>local time</th>";
   nowIdx=H.findIndex(h=>h.utc<=Date.now()&&Date.now()<h.utc+3600e3);
-  cols.forEach(o=>{const c=[o.newDay?"dayb":"",bestSet.has(o.i)?"best":"",o.i===nowIdx?"now nowc":""].join(" ");
+  cols.forEach(o=>{const c=[o.newDay?"dayb":"",bestSet.has(o.i)?"best":"",o.i===nowIdx?"now nowc":"",o.i===selIdx?"sel":""].join(" ");
     html+=`<th class="${c}" data-i="${o.i}" style="cursor:pointer" title="${bestSet.has(o.i)?"best clear window":""}">${o.i===nowIdx?"now":o.h.t.slice(11,13)}</th>`});
   html+="</tr></thead><tbody>";
   for(const r of ROWS){
