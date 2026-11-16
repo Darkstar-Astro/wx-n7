@@ -40,6 +40,7 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 table.g th.best{background:#2a7f50;color:#eafff1;border-radius:4px}
 table.g th.now{color:#ffd76a;font-weight:700}
 table.g td.nowc,table.g th.nowc{box-shadow:inset 2px 0 0 #ffd76a}
+.quip{font-style:italic;color:#aab3c4;margin:-2px 0 6px;font-size:13.5px}
 .verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
@@ -373,6 +374,40 @@ function moonSVG(k,waxing,size=44){
     <circle cx="${c}" cy="${c}" r="${r}" fill="#1b2232" stroke="#2c3647"/>
     ${k>0.01?`<path d="${lit}" fill="#f2e6c4"/>`:""}</svg>`;
 }
+// ---------- sarcasm (picked per night + site, stable across refreshes) ----------
+const QUIP_NO=[
+ "Perfect night to finally clean those eyepieces.",
+ "The clouds send their regards. Again.",
+ "Good news: your collimation can't drift if you don't use the scope.",
+ "Belgium's most observed deep-sky object: stratus.",
+ "Ideal conditions for observing the inside of your eyelids.",
+ "Telescope status: decorative.",
+ "Tonight's target: the cloud deck. Magnitude: grey.",
+ "New gear arrived? That explains it.",
+ "Seeing: excellent. Of the ceiling.",
+ "Your dew heater thanks you for the night off.",
+ "Clouds 1, astronomers 0.",
+ "A great night to plan sessions you'll never get to do.",
+ "Somewhere above all that, Saturn is having a lovely time.",
+ "Humour setting 75%. Sky setting 0%.",
+ "Rain on the radar, tea in the pot.",
+ "Stellarium has clear skies every night. Just saying.",
+ "Statistically, a perfectly normal Belgian night.",
+ "Bortle class: Flemish overcast.",
+ "The universe is still there. You'll have to take our word for it.",
+ "Mount parked. Expectations parked. Everything parked."
+];
+const QUIP_MAYBE=[
+ "Gaps possible. So is disappointment.",
+ "Set up fast and pray.",
+ "Sucker holes forecast. Bring patience.",
+ "Keep the scope in the car. Engine running.",
+ "Partly clear, mostly optimistic.",
+ "50/50, and the clouds always win ties.",
+ "Bright targets only, and only if you're quick.",
+ "The sky is negotiating. Bring a lawyer."
+];
+function quip(list,key){let h=0;for(const ch of key)h=(h*31+ch.charCodeAt(0))>>>0;return list[h%list.length]}
 // ---------- tonight summary ----------
 function hhmm(t){return t.slice(11,16)}
 function nightBlocks(){
@@ -479,6 +514,7 @@ function renderTonight(){
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
+    ${vcls==="go"?"":`<div class="quip">“${quip(vcls==="no"?QUIP_NO:QUIP_MAYBE,nightDate+p.name)}”</div>`}
     <div class="small mut">Forecast confidence: ${(()=>{const cf=nightConf(bl[nightSel]);return `<b style="color:${["#c98a8f","#d9a640","#7fd18b"][cf.c]}">${cf.txt}</b> ${cf.dots}`+(cf.partial?" · forecast data ends mid-night (partial)":"")})()}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
