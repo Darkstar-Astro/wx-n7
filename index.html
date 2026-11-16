@@ -45,6 +45,9 @@ table.g td.nowc,table.g th.nowc{box-shadow:inset 2px 0 0 #ffd76a}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
 .kpi{background:#0b0e14;border:1px solid var(--line);border-radius:10px;padding:8px}
+.kpi.k2{background:#14301f;border-color:#2a7f50}.kpi.k2 b{color:#8fe0ad}
+.kpi.k1{background:#2e2410;border-color:#94701f}.kpi.k1 b{color:#e3b552}
+.kpi.k0{background:#2e161a;border-color:#7a3a44}.kpi.k0 b{color:#e58f98}
 .kpi b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi span{color:var(--mut);font-size:11.5px;line-height:1.3;display:block}
 .mut{color:var(--mut)} .small{font-size:12px}
@@ -503,6 +506,7 @@ function renderNights(){
     return `<button class="nchip ${v[0]}${k===nightSel?" on":""} cf${cf.c}" data-n="${k}"><b>${d}</b><span>${v[1]} ${v[2]}</span><span class="mut">${moonSVG(m.illum,m.waxing,14)} ${Math.round(m.illum*100)}%</span><span class="conf">${cf.dots}${cf.partial?" partial":""}</span></button>`;
   }).join("");
 }
+const kc=l=>l==null?"":["k0","k1","k2"][l];
 function renderTonight(){
   const p=presets[cur], el=document.getElementById("tonight");
   const bl=nightBlocks(); bestSet=new Set();
@@ -578,12 +582,12 @@ function renderTonight(){
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
     <div class="kpis">
-      <div class="kpi"><b>${n0(M("ccl"))}/${n0(M("ccm"))}/${n0(M("cch"))}%</b><span>cloud L/M/H</span></div>
-      <div class="kpi"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog</span></div>
-      <div class="kpi"><b>${dewTxt}</b><span>dew · ${n0(M("rh"))}% · min ${isFinite(minT)?minT.toFixed(0):"–"}°C</span></div>
-      <div class="kpi"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>≈ seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
-      <div class="kpi"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>≈ transp. · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
-      <div class="kpi"><b>${(()=>{const v=night.map(h=>h.c.sqm).filter(nn);return v.length?Math.max(...v).toFixed(1)+" · B"+bortle(Math.max(...v)):"–"})()}</b><span>≈ best SQM</span></div>
+      <div class="kpi ${kc(nn(M("ccl"))||nn(M("ccm"))?L3(Math.max(M("ccl")??0,M("ccm")??0,0.5*(M("cch")??0)),20,50):null)}"><b>${n0(M("ccl"))}/${n0(M("ccm"))}/${n0(M("cch"))}%</b><span>cloud L/M/H</span></div>
+      <div class="kpi ${kc({low:2,moderate:1,high:0}[fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))])}"><b>${fogTxt(Math.max(...night.map(h=>h.c.fog).filter(nn)))}</b><span>fog</span></div>
+      <div class="kpi ${kc({low:2,moderate:1,high:0}[dewTxt])}"><b>${dewTxt}</b><span>dew · ${n0(M("rh"))}% · min ${isFinite(minT)?minT.toFixed(0):"–"}°C</span></div>
+      <div class="kpi ${kc(nn(seeing)?L3(seeCls(seeing)[1],4,3,false):null)}"><b>${nn(seeing)?seeCls(seeing)[2]:"–"}</b><span>≈ seeing · ${nn(seeing)?seeCls(seeing)[3]:""}</span></div>
+      <div class="kpi ${kc(nn(M("transp"))?L3(traCls(M("transp"))[1],4,3,false):null)}"><b>${nn(M("transp"))?traCls(M("transp"))[2]:"–"}</b><span>≈ transp. · ${nn(M("transp"))?traCls(M("transp"))[3]:""}</span></div>
+      ${(()=>{const v=night.map(h=>h.c.sqm).filter(nn),mx=v.length?Math.max(...v):null;return `<div class="kpi ${kc(nn(mx)?L3(mx,p.sqm-0.3,p.sqm-1,false):null)}"><b>${nn(mx)?mx.toFixed(1)+" · B"+bortle(mx):"–"}</b><span>≈ best SQM</span></div>`})()}
     </div>`;
 }
 
