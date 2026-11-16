@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Astro Weather — multi-model seeing & sky</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -146,6 +147,21 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
+const APP_VERSION="20261116183456";
+// self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
+async function checkUpdate(){
+  try{
+    const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return;
+    const {v}=await r.json();
+    if(v&&v!==APP_VERSION){
+      if(sessionStorage.getItem("astrowx.reloadedFor")===v) return; // avoid loops
+      sessionStorage.setItem("astrowx.reloadedFor",v);
+      location.replace(location.pathname+"?v="+encodeURIComponent(v));
+    }
+  }catch(e){}
+}
+checkUpdate();
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkUpdate()});
 // ---------- settings ----------
 const DEFAULT_PRESETS = [
   {name:"Aalst", lat:50.937, lon:4.040, sqm:19.0},
