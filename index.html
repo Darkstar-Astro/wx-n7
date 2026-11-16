@@ -321,9 +321,14 @@ async function load(){
   document.getElementById("locname").textContent=p.name;
   document.getElementById("loccoord").textContent=`${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° · site SQM ${p.sqm} (Bortle ${bortle(p.sqm)})`;
   setStatus("Fetching models…");
-  const [res,aq]=await Promise.all([Promise.all(MODELS.map(m=>fetchModel(m,p))),fetchAQ(p)]);
-  const ok=res.filter(Boolean);
-  if(!ok.length){setStatus('<span class="err">No model data could be fetched. Check your connection. This page must be opened as a file or from your own web host, because embedded/sandboxed viewers block outside requests.</span>');return}
+  const grab=()=>Promise.all([Promise.all(MODELS.map(m=>fetchModel(m,p))),fetchAQ(p)]);
+  let [res,aq]=await grab(), ok=res.filter(Boolean), stale=null;
+  if(!ok.length){setStatus("No answer from the forecast server, retrying…");await new Promise(r=>setTimeout(r,4000));[res,aq]=await grab();ok=res.filter(Boolean)}
+  const ck="cache."+p.lat.toFixed(2)+","+p.lon.toFixed(2);
+  if(ok.length){store.set(ck,{ts:Date.now(),aq,ok:ok.map(o=>({k:o.m.key,id:o.id,j:o.j}))})}
+  else{const c=store.get(ck,null);
+    if(c&&Date.now()-c.ts<36*3600e3){ok=c.ok.map(o=>({m:MODELS.find(m=>m.key===o.k),id:o.id,j:o.j})).filter(o=>o.m);aq=c.aq;stale=c.ts}
+    if(!ok.length){setStatus('<span class="err">The forecast server (Open-Meteo) isn\'t answering right now, and there is no recent saved forecast. Check your connection and tap ↻ in a few minutes.</span>');return}}
   loadedModels=ok.map(o=>o.m);
   
   const base=ok[0].j, off=base.utc_offset_seconds||0, times=base.hourly.time;
@@ -360,7 +365,8 @@ async function load(){
     H.push(h);
   });
   const ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-  setStatus(`Updated ${ts} · ${ok.length}/${MODELS.length} models · CAMS aerosols ${aq?"✓":"✗"}`);
+  if(stale) setStatus(`<span style="color:#d9a640">⚠ Forecast server not answering: showing saved forecast from ${new Date(stale).toLocaleString([], {weekday:"short",hour:"2-digit",minute:"2-digit"})}. Tap ↻ to retry.</span>`);
+  else setStatus(`Updated ${ts} · ${ok.length}/${MODELS.length} models · CAMS aerosols ${aq?"✓":"✗"}`);
   renderTonight(); renderNights(); renderGrid();
 }
 function setStatus(h){document.getElementById("status").innerHTML=h}
