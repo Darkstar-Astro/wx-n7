@@ -236,18 +236,24 @@ function moonInfo(ms,lat,lon){
 }
 
 // ---------- fetching ----------
-function fUrl(id,p){
-  return `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&hourly=${VARS.join(",")}`+
+const VARS_CORE=["cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","relative_humidity_2m","dew_point_2m",
+  "temperature_2m","wind_speed_10m","wind_gusts_10m","precipitation"];
+let lastErr="";
+function fUrl(id,p,vars=VARS){
+  return `https://api.open-meteo.com/v1/forecast?latitude=${(+p.lat).toFixed(4)}&longitude=${(+p.lon).toFixed(4)}&hourly=${vars.join(",")}`+
          `&models=${id}&forecast_days=4&timezone=auto&wind_speed_unit=ms`;
 }
 async function fetchModel(m,p){
   for(const id of m.ids){
-    try{
-      const r=await fetch(fUrl(id,p)); if(!r.ok) continue;
-      const j=await r.json(); if(j.error||!j.hourly) continue;
-      const cc=j.hourly.cloud_cover||[]; if(!cc.some(nn)) continue;
-      return {m,id,j};
-    }catch(e){}
+    for(const vars of [VARS,VARS_CORE]){        // if the API rejects an optional variable, retry with the core set
+      try{
+        const r=await fetch(fUrl(id,p,vars)); let j=null; try{j=await r.json()}catch(e){}
+        if(!r.ok||!j||j.error){lastErr=`${m.label}: HTTP ${r.status}${j&&j.reason?" – "+j.reason:""}`; if(r.status===400) continue; break}
+        if(!j.hourly) break;
+        const cc=j.hourly.cloud_cover||[]; if(!cc.some(nn)){lastErr=`${m.label}: no data for this location`; break}
+        return {m,id,j};
+      }catch(e){lastErr=`network error (${e.message||"request blocked or offline"})`; break}
+    }
   }
   return null;
 }
@@ -321,6 +327,7 @@ async function load(){
   document.getElementById("locname").textContent=p.name;
   document.getElementById("loccoord").textContent=`${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° · site SQM ${p.sqm} (Bortle ${bortle(p.sqm)})`;
   setStatus("Fetching models…");
+  lastErr="";
   const grab=()=>Promise.all([Promise.all(MODELS.map(m=>fetchModel(m,p))),fetchAQ(p)]);
   let [res,aq]=await grab(), ok=res.filter(Boolean), stale=null;
   if(!ok.length){setStatus("No answer from the forecast server, retrying…");await new Promise(r=>setTimeout(r,4000));[res,aq]=await grab();ok=res.filter(Boolean)}
@@ -328,7 +335,7 @@ async function load(){
   if(ok.length){store.set(ck,{ts:Date.now(),aq,ok:ok.map(o=>({k:o.m.key,id:o.id,j:o.j}))})}
   else{const c=store.get(ck,null);
     if(c&&Date.now()-c.ts<36*3600e3){ok=c.ok.map(o=>({m:MODELS.find(m=>m.key===o.k),id:o.id,j:o.j})).filter(o=>o.m);aq=c.aq;stale=c.ts}
-    if(!ok.length){setStatus('<span class="err">The forecast server (Open-Meteo) isn\'t answering right now, and there is no recent saved forecast. Check your connection and tap ↻ in a few minutes.</span>');return}}
+    if(!ok.length){setStatus(`<span class="err">The forecast server (Open-Meteo) isn't answering right now, and there is no recent saved forecast. Check your connection and tap ↻ in a few minutes.<br><small>Details: ${lastErr||"unknown"} · ${(+p.lat).toFixed(3)}, ${(+p.lon).toFixed(3)}</small></span>`);return}}
   loadedModels=ok.map(o=>o.m);
   
   const base=ok[0].j, off=base.utc_offset_seconds||0, times=base.hourly.time;
