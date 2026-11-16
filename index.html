@@ -40,7 +40,7 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 table.g th.best{background:#2a7f50;color:#eafff1;border-radius:4px}
 table.g th.now{color:#ffd76a;font-weight:700}
 table.g td.nowc,table.g th.nowc{box-shadow:inset 2px 0 0 #ffd76a}
-.verdict.quip{margin-top:-4px}
+.verdict.quip{margin-top:-4px;font-size:15.5px;font-weight:600}
 .verdict{font-size:20px;font-weight:650;margin:2px 0 6px}
 .verdict.go{color:#7fd18b}.verdict.maybe{color:#e8c46a}.verdict.no{color:#f08080}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
@@ -400,13 +400,17 @@ const QUIP_NO=[
 ];
 const QUIP_MAYBE=[
  "Gaps possible. So is disappointment.",
- "Set up fast and pray.",
  "Sucker holes forecast. Bring patience.",
- "Keep the scope in the car. Engine running.",
+ "Set up fast, observe faster.",
  "Partly clear, mostly optimistic.",
  "50/50, and the clouds always win ties.",
- "Bright targets only, and only if you're quick.",
- "The sky is negotiating. Bring a lawyer."
+ "Keep the scope in the car. Engine running.",
+ "Grab-and-go night. Emphasis on go.",
+ "Pick bright targets and lower your expectations.",
+ "The sky is negotiating. Bring a lawyer.",
+ "Clear-ish. The '-ish' is doing a lot of work.",
+ "Binoculars night: fast in, fast out.",
+ "Worth a look. Not worth hauling the Dob out."
 ];
 function quip(list,key){let h=0;for(const ch of key)h=(h*31+ch.charCodeAt(0))>>>0;return list[h%list.length]}
 // ---------- tonight summary ----------
