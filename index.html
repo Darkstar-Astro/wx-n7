@@ -414,6 +414,23 @@ const QUIP_NO=[
  "Bloody hell, not again.",
  "Only thing you're collimating tonight is the sofa cushions."
 ];
+const QUIP_GO=[
+ "Clear skies. Now watch the neighbour switch on his floodlight.",
+ "Get out there before the models change their minds.",
+ "No excuses tonight. None. Move.",
+ "Stop reading this and go outside, you muppet.",
+ "Clear tonight, so of course you work at 7 tomorrow.",
+ "Enjoy it. Next one's probably in March.",
+ "Dew will find you. It always does.",
+ "Clear and cold. Your fingers will hate you.",
+ "Go on, forget the battery pack again.",
+ "The universe is open for business. Don't keep it waiting.",
+ "Perfect night. Watch the laptop decide it needs updates.",
+ "Clear skies. The mount will refuse to align anyway.",
+ "Great night for it. Terrible night for your sleep schedule.",
+ "The clouds are on a break. Use it, you lazy sod.",
+ "Finally. Now where the hell did you put the red torch?"
+];
 const QUIP_MAYBE=[
  "Gaps possible. So is disappointment.",
  "Sucker holes forecast. Bring patience.",
@@ -538,7 +555,7 @@ function renderTonight(){
       <span class="free">🌑 Moon-free dark: ${freeTxt}${longest?` <span class="mut">(${freeH} h)</span>`:""}</span></div>
     </div>
     <div class="verdict ${vcls}">${vtxt}</div>
-    ${vcls==="go"?"":`<div class="verdict ${vcls} quip">“${quip(vcls==="no"?QUIP_NO:QUIP_MAYBE,nightDate+p.name)}”</div>`}
+    <div class="verdict ${vcls} quip">“${quip(vcls==="no"?QUIP_NO:vcls==="maybe"?QUIP_MAYBE:QUIP_GO,nightDate+p.name)}”</div>
     <div class="small mut">Forecast confidence: ${(()=>{const cf=nightConf(bl[nightSel]);return `<b style="color:${["#c98a8f","#d9a640","#7fd18b"][cf.c]}">${cf.txt}</b> ${cf.dots}`+(cf.partial?" · forecast data ends mid-night (partial)":"")})()}</div>
     <div class="small">🛰 Check cirrus now: <a href="https://www.weerplaza.nl/satelliet/europa/belgie/" target="_blank" rel="noopener" style="color:var(--acc)">Weerplaza satellite</a> · <a href="https://zoom.earth/places/belgium/brussels" target="_blank" rel="noopener" style="color:var(--acc)">Zoom Earth</a></div>
     <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
