@@ -119,6 +119,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
       <p><b>Seeing scale.</b> 5 Excellent (&lt;1.2″), 4 Good (1.2–1.7″), 3 Average (1.7–2.3″), 2 Poor (2.3–3″), 1 Bad (&gt;3″). The arcsecond value is the estimated star blur. Typical good nights in Belgium are 3–4.</p>
       <p><b>Transparency (0–100).</b> <code>100 − 0.6·high cloud − 1.2·max(0, RH₂ₘ−70) − 0.3·max(0, RH₇₀₀−60) − 80·AOD</code>. High cloud is penalised because thin cirrus ruins transparency even when the total cloud figure looks low. Low and mid cloud already count in the cloud rows.</p>
       <p><b>Confidence</b> per night: high within ~30 h, medium up to ~54 h, low beyond that. It drops a step when the models disagree on cloud (spread &gt;12%), two steps when they disagree strongly (&gt;25%), and one step if fewer than 3 models loaded. "Partial" means the forecast data ends during that night.</p>
+      <p><b>Mist/low-cloud risk</b> is added to the verdict only when everything lines up: humidity ≥95%, temperature within 1 °C of the dew point, wind under 2 m/s and a clear sky (so the ground cools). It is deliberately strict, so it should appear rarely.</p>
       <p><b>Fog.</b> Uses the model visibility where a model gives it (under 1 km is high risk, under 2 km elevated). Otherwise, a temperature − dew point spread of 0.5 °C or less with wind under 3 m/s counts as high risk. The page shows the median across models.</p>
       <p><b>Transparency scale.</b> 5 Excellent (≥80), 4 Good (65–79), 3 Average (50–64), 2 Poor (35–49), 1 Bad (&lt;35), from the 0–100 formula above.</p>
       <p><b>Dew.</b> Temperature − dew point at 2 m: under 1.5 °C means high dew risk, under 3 °C moderate.</p>
@@ -149,7 +150,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261117210643";
+const APP_VERSION="20261117211050";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -576,6 +577,9 @@ function renderTonight(){
     vtxt=nn(lm)&&lm<30?"Marginal: mainly high/thin cloud, bright targets OK":"Marginal: gaps possible, watch the radar"}
   else {vcls="no";vtxt="No-go: clouded out"}
   if(best&&night.slice(best.a,best.b+1).some(h=>nn(h.c.cch)&&h.c.cch>=30)) vtxt+=" · thin cirrus possible";
+  // strict mist / low-stratus formation risk: near-saturated, calm, clear (radiative cooling)
+  const mistH=night.find(h=>nn(h.c.rh)&&h.c.rh>=95&&nn(h.c.spread)&&h.c.spread<=1&&(h.c.ws??9)<2&&(h.c.cceff??h.c.cc??100)<=30);
+  if(mistH&&vcls!=="no") vtxt+=` · risk of mist/low cloud forming from ~${hhmm(mistH.t)}`;
   // summarise the best clear window if there is one, else all dark hours
   const win=best?night.slice(best.a,best.b+1):dark;
   const M=f=>median(win.map(h=>h.c[f]));
