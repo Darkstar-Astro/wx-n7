@@ -111,7 +111,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
     <details>
       <summary>Method & assumptions</summary>
       <div class="small" style="margin-top:8px">
-      <p><b>Data.</b> Open-Meteo, fetched live from your browser, one request per model: ECMWF IFS, DWD ICON (seamless: D2→EU→global), Météo-France (AROME→ARPEGE), KNMI Harmonie, UK Met Office, NOAA GFS. Aerosol optical depth comes from CAMS (Open-Meteo air-quality API). A model that is out of domain or returns nothing is left out, and the top-right list shows which ones loaded.</p>
+      <p><b>Data.</b> Open-Meteo, fetched live from your browser, one request per model: ECMWF IFS, DWD ICON (seamless: D2→EU→global), Météo-France (AROME→ARPEGE), KNMI Harmonie, DMI Harmonie (2 km), UK Met Office, NOAA GFS. Aerosol optical depth comes from CAMS (Open-Meteo air-quality API). A model that is out of domain or returns nothing is left out, and the top-right list shows which ones loaded.</p>
       <p><b>Consensus.</b> Low, mid and total cloud are the <i>mean</i> across models: when models split between clear and overcast, reality is usually broken cloud, which a median would hide. The other metrics are the <i>median</i> across the models that loaded, except high cloud (worst model, i.e. maximum) (worst model, i.e. maximum), because models routinely miss or mistime thin cirrus. Transparency is the median across models, each one calculated with that worst-case high cloud. Model agreement is the standard deviation of total cloud cover across models.</p>
       <p><b>Seeing (a proxy, not a measurement).</b> None of these models outputs seeing. It is estimated per model as<br>
       <code>arcsec = 0.9 + 0.045·max(0, jet−12) + 0.04·max(0, shear−8) + 0.06·max(0, gust−4)</code><br>
@@ -150,7 +150,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261120202901";
+const APP_VERSION="20261120202944";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -176,6 +176,7 @@ const MODELS = [
   {key:"icon",  label:"DWD ICON",  ids:["icon_seamless"]},
   {key:"mf",    label:"Météo-France", ids:["meteofrance_seamless"]},
   {key:"knmi",  label:"KNMI Harmonie", ids:["knmi_seamless"]},
+  {key:"dmi",   label:"DMI Harmonie",  ids:["dmi_seamless"]},
   {key:"ukmo",  label:"UK Met Office", ids:["ukmo_seamless"]},
   {key:"gfs",   label:"NOAA GFS", ids:["gfs_seamless"]},
 ];
