@@ -150,7 +150,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261120201408";
+const APP_VERSION="20261120202901";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -612,7 +612,7 @@ function renderTonight(){
     <div class="verdict ${vcls}">${vtxt}</div>
     <div class="verdict ${vcls} quip">“${quip(vcls==="no"?QUIP_NO:vcls==="maybe"?QUIP_MAYBE:QUIP_GO,nightDate+p.name)}”</div>
     <div class="small mut">Forecast confidence: ${(()=>{const cf=nightConf(bl[nightSel]);return `<b style="color:${["#c98a8f","#d9a640","#7fd18b"][cf.c]}">${cf.txt}</b> ${cf.dots}`+(cf.partial?" · forecast data ends mid-night (partial)":"")})()}</div>
-    <div class="small">🛰 Check the sky now: <a href="https://www.windy.com/-Satellite-satellite?satellite,${(+p.lat).toFixed(3)},${(+p.lon).toFixed(3)},8" target="_blank" rel="noopener" style="color:var(--acc)">Windy satellite</a> · <a href="https://www.weerenradar.be/weerradar/brussel/6898284?layer=wr&center=${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}&placemark=${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}" target="_blank" rel="noopener" style="color:var(--acc)">Weer &amp; Radar</a></div>
+    <div class="small">🛰 Check the sky now: <a href="https://www.windy.com/-Satellite-satellite?satellite,${(+p.lat).toFixed(3)},${(+p.lon).toFixed(3)},8" target="_blank" rel="noopener" style="color:var(--acc)">Windy satellite</a> · <a href="https://www.weerenradar.be/weerradar/brussel/6898284?layer=wr&center=${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}&placemark=${(+p.lat).toFixed(4)},${(+p.lon).toFixed(4)}" target="_blank" rel="noopener" style="color:var(--acc)">Weer &amp; Radar</a> · <a href="https://www.yr.no/en/forecast/hourly-table/${(+p.lat).toFixed(3)},%20${(+p.lon).toFixed(3)}" target="_blank" rel="noopener" style="color:var(--acc)">Yr</a></div>
     <div class="mut small" style="margin-top:6px">${best?"Figures for "+winTxt:"Figures for the whole night"} · ≈ = estimate</div>
     <div class="kpis">
       <div class="kpi ${kc(nn(M("ccl"))||nn(M("ccm"))?L3(Math.max(M("ccl")??0,M("ccm")??0,0.5*(M("cch")??0)),20,50):null)}"><b>${n0(M("ccl"))}/${n0(M("ccm"))}/${n0(M("cch"))}%</b><span>cloud L/M/H</span></div>
