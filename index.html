@@ -150,7 +150,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261120201047";
+const APP_VERSION="20261120201107";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -578,7 +578,8 @@ function renderTonight(){
   let vcls,vtxt;
   if(best){vcls="go";vtxt=`Go: ${hhmm(night[best.a].t)}–${hhmm(night[best.b].t.replace(/T(\d\d)/,(m,x)=>"T"+String((+x+1)%24).padStart(2,"0")))} looks clear`}
   else if(maxS>=40){vcls="maybe";const lm=median(night.map(h=>Math.max(h.c.ccl??0,h.c.ccm??0)));
-    vtxt=nn(lm)&&lm<30?"Marginal: mainly high/thin cloud, bright targets OK":"Marginal: gaps possible, watch the radar"}
+    const hi=median(night.map(h=>h.c.cchMed??0));
+    vtxt=nn(lm)&&lm<15&&hi>=30?"Marginal: mainly high/thin cloud, bright targets OK":"Marginal: broken cloud, gaps possible, watch the radar"}
   else {vcls="no";vtxt="No-go: clouded out"}
   // model split: how many models see real (low/mid) cloud during the clear window
   if(best){const win=night.slice(best.a,best.b+1),keys=loadedModels.map(m=>m.key);
