@@ -150,15 +150,15 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261120201107";
+const APP_VERSION="20261120201338";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return;
     const {v}=await r.json();
     if(v&&v!==APP_VERSION){
-      if(sessionStorage.getItem("astrowx.reloadedFor")===v) return; // avoid loops
-      sessionStorage.setItem("astrowx.reloadedFor",v);
+      // already asked for exactly this version via ?v= and still got an old copy: stop (no loop)
+      if(new URLSearchParams(location.search).get("v")===v) return;
       location.replace(location.pathname+"?v="+encodeURIComponent(v));
     }
   }catch(e){}
