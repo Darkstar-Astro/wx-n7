@@ -151,7 +151,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261126103232";
+const APP_VERSION="20261126103354";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -354,12 +354,18 @@ function score(c){
 }
 
 // ---------- build ----------
+let loadSeq=0;
 async function load(){
   const p=presets[cur]; selIdx=null;
   document.getElementById("locname").textContent=p.name;
   document.getElementById("loccoord").textContent=`${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° · site SQM ${p.sqm} (Bortle ${bortle(p.sqm)})`;
+  const seq=++loadSeq;
   setStatus("Fetching models…");
   lastErr="";
+  // show the saved forecast immediately, then replace it when fresh data arrives
+  {const c=store.get("cache."+p.lat.toFixed(2)+","+p.lon.toFixed(2),null);
+   if(c&&Date.now()-c.ts<36*3600e3){const okc=c.ok.map(o=>({m:MODELS.find(m=>m.key===o.k),id:o.id,j:o.j})).filter(o=>o.m);
+     if(okc.length){try{build(okc,c.aq,null,p,`Saved forecast from ${new Date(c.ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})} · updating…`)}catch(e){}}}}
   const grab=()=>Promise.all([Promise.all(MODELS.map(m=>fetchModel(m,p))),fetchAQ(p)]);
   let [res,aq]=await grab(), ok=res.filter(Boolean), stale=null;
   if(!ok.length){setStatus("No answer from the forecast server, retrying…");await new Promise(r=>setTimeout(r,4000));[res,aq]=await grab();ok=res.filter(Boolean)}
@@ -368,8 +374,11 @@ async function load(){
   else{const c=store.get(ck,null);
     if(c&&Date.now()-c.ts<36*3600e3){ok=c.ok.map(o=>({m:MODELS.find(m=>m.key===o.k),id:o.id,j:o.j})).filter(o=>o.m);aq=c.aq;stale=c.ts}
     if(!ok.length){setStatus(`<span class="err">The forecast server (Open-Meteo) isn't answering right now, and there is no recent saved forecast. Check your connection and tap ↻ in a few minutes.<br><small>Details: ${lastErr||"unknown"} · ${(+p.lat).toFixed(3)}, ${(+p.lon).toFixed(3)}</small></span>`);return}}
+  if(seq!==loadSeq) return;            // user switched site meanwhile
+  build(ok,aq,stale,p);
+}
+function build(ok,aq,stale,p,note){
   loadedModels=ok.map(o=>o.m);
-  
   const base=ok[0].j, off=base.utc_offset_seconds||0, times=base.hourly.time;
   const aqIdx={}; if(aq) aq.hourly.time.forEach((t,i)=>aqIdx[t]=i);
   const nowMs=Date.now();
@@ -414,7 +423,8 @@ async function load(){
     H.push(h);
   });
   const ts=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-  if(stale) setStatus(`<span style="color:#d9a640">⚠ Forecast server not answering: showing saved forecast from ${new Date(stale).toLocaleString([], {weekday:"short",hour:"2-digit",minute:"2-digit"})}. Tap ↻ to retry.</span>`);
+  if(note) setStatus(note);
+  else if(stale) setStatus(`<span style="color:#d9a640">⚠ Forecast server not answering: showing saved forecast from ${new Date(stale).toLocaleString([], {weekday:"short",hour:"2-digit",minute:"2-digit"})}. Tap ↻ to retry.</span>`);
   else setStatus(`Updated ${ts} · ${ok.length}/${MODELS.length} models · CAMS aerosols ${aq?"✓":"✗"}`);
   renderTonight(); renderNights(); renderGrid(); renderTrend();
 }
