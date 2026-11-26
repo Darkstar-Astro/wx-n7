@@ -151,7 +151,7 @@ code{background:#0b0e14;padding:1px 4px;border-radius:4px}
 
 <script>
 "use strict";
-const APP_VERSION="20261122085834";
+const APP_VERSION="20261126103232";
 // self-update: iOS home-screen apps keep old copies; check version.json and reload when it changed
 async function checkUpdate(){
   try{
@@ -267,23 +267,28 @@ function fUrl(id,p,vars=VARS){
   return `https://api.open-meteo.com/v1/forecast?latitude=${(+p.lat).toFixed(4)}&longitude=${(+p.lon).toFixed(4)}&hourly=${vars.join(",")}`+
          `&models=${id}&forecast_days=4&past_hours=12&timezone=auto&wind_speed_unit=ms`;
 }
+// fetch with a hard timeout: a hanging server must count as a failure, so retry/fallback can kick in
+async function tfetch(url,ms=12000){
+  const ac=new AbortController(), t=setTimeout(()=>ac.abort(),ms);
+  try{return await fetch(url,{signal:ac.signal})}finally{clearTimeout(t)}
+}
 async function fetchModel(m,p){
   for(const id of m.ids){
     for(const vars of [VARS,VARS_CORE]){        // if the API rejects an optional variable, retry with the core set
       try{
-        const r=await fetch(fUrl(id,p,vars)); let j=null; try{j=await r.json()}catch(e){}
+        const r=await tfetch(fUrl(id,p,vars)); let j=null; try{j=await r.json()}catch(e){}
         if(!r.ok||!j||j.error){lastErr=`${m.label}: HTTP ${r.status}${j&&j.reason?" – "+j.reason:""}`; if(r.status===400) continue; break}
         if(!j.hourly) break;
         const cc=j.hourly.cloud_cover||[]; if(!cc.some(nn)){lastErr=`${m.label}: no data for this location`; break}
         return {m,id,j};
-      }catch(e){lastErr=`network error (${e.message||"request blocked or offline"})`; break}
+      }catch(e){lastErr=e.name==="AbortError"?`${m.label}: no answer within 12 s (server slow or down)`:`network error (${e.message||"request blocked or offline"})`; break}
     }
   }
   return null;
 }
 async function fetchAQ(p){
   try{
-    const r=await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.lat}&longitude=${p.lon}&hourly=aerosol_optical_depth,dust&forecast_days=4&timezone=auto`);
+    const r=await tfetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.lat}&longitude=${p.lon}&hourly=aerosol_optical_depth,dust&forecast_days=4&timezone=auto`);
     if(!r.ok) return null; const j=await r.json(); return j.hourly?j:null;
   }catch(e){return null}
 }
